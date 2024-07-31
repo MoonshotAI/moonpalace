@@ -1,4 +1,4 @@
-module moonpalace
+module github.com/MoonshotAI/moonpalace
 
 go 1.22
 
