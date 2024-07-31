@@ -67,6 +67,7 @@ jobs:
 
   create-release:
     runs-on: ubuntu-latest
+    needs: [build-macos-amd64, build-macos-arm64, build-windows, build-linux]
     steps:
       - uses: actions/create-release@v1.1.4
         id: release
