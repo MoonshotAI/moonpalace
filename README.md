@@ -48,6 +48,17 @@ Use "moonpalace [command] --help" for more information about a command.
 
 *如果你仍然无法检索到 `moonpalace` 二进制文件，请尝试将 `$GOPATH/bin/` 目录添加到你的 `$PATH` 环境变量中。*
 
+### 从 Releases 页面下载二进制（可执行）文件
+
+你可以从 [Releases](https://github.com/MoonshotAI/moonpalace/releases) 页面下载编译好的二进制（可执行）文件：
+
+- moonpalace-linux
+- moonpalace-macos-amd64
+- moonpalace-macos-arm64
+- moonpalace-windows.exe
+
+请根据自己的平台下载对应的二进制（可执行）文件，并将二进制（可执行）文件放置在已被包含在环境变量 `$PATH` 中的目录中，将其更名为 `moonpalace`，最后为其赋予可执行权限。
+
 ## 使用方式
 
 ### 启动服务
