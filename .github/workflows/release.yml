@@ -1,6 +1,6 @@
 name: release
 
-permission:
+permissions:
   contents: write
 
 on:
