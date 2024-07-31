@@ -18,7 +18,7 @@ MoonPalace（月宫）是由 Moonshot AI 月之暗面提供的 API 调试工具�
 如果你已经安装了 `go` 工具链，你可以执行以下命令来安装 MoonPalace：
 
 ```shell
-$ go install github.com/MoonshotAI/moonpalace
+$ go install github.com/MoonshotAI/moonpalace@latest
 ```
 
 上述命令会在你的 `$GOPATH/bin/` 目录安装编译后的二进制文件，运行 `moonpalace` 命令来检查是否成功安装：
