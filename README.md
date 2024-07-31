@@ -321,7 +321,7 @@ $ cat $HOME/Downloads/chatcmpl-2e1aa823e2c94ebdad66450a0e6df088.json
 }
 ```
 
-由于当前阶段我们暂时没有自动投递的工具和手段，所以还烦请各位开发者将导出的请求文件通过企业微信、邮件等方式投递给我们。
+**我们推荐开发者使用 [Github Issues](https://github.com/MoonshotAI/moonpalace/issues) 提交 Good Case 或 Bad Case**，但如果你不想公开你的请求信息，你也可以通过企业微信、电子邮件等方式将 Case 投递给我们。
 
 你可以将导出的文件投递至以下邮箱：
 
@@ -334,3 +334,4 @@ $ cat $HOME/Downloads/chatcmpl-2e1aa823e2c94ebdad66450a0e6df088.json
 - [ ] 批量导出功能；
 - [ ] 自动上报，无需手动投递；
 - [ ] 提供 API Server Mock 功能；
+- [ ] 提供可视化 Web 管理后台；
