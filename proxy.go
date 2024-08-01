@@ -23,6 +23,8 @@ import (
 var (
 	httpProxyKey          string
 	httpProxyDetectRepeat bool
+	repeatThrehold        float64
+	repeatMinlen          int32
 )
 
 func startCommand() *cobra.Command {
@@ -60,6 +62,8 @@ func startCommand() *cobra.Command {
 	flags.Int16VarP(&port, "port", "p", 9988, "port to listen on")
 	flags.StringVarP(&httpProxyKey, "key", "k", "", "API key by default")
 	flags.BoolVar(&httpProxyDetectRepeat, "detect-repeat", false, "detect and prevent repeating tokens in streaming output")
+	flags.Float64VarP(&repeatThrehold, "repeat-threhold", "rep", 0.5, "repeat threhold, a float between [0, 1]")
+	flags.Int32VarP(&repeatMinlen, "repeat-minlen", "len", 100, "repeat min length, minimum string length to detect repeat")
 	return cmd
 }
 
@@ -248,7 +252,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 										detectors[choice.Index] = detector
 									}
 									detector.AddString(choice.Delta.Content)
-									if rep := detector.GetRepeatness(); detector.Length() > 100 && rep < 0.5 {
+									if detector.Length() > repeatMinlen && detector.GetRepeatness() < repeatThrehold {
 										err = errors.New("it appears that there is an issue with content repeating in the current response")
 										w.Write([]byte("[DONE]"))
 										goto FINISHING
