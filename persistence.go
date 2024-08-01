@@ -234,6 +234,10 @@ func (r *Request) IsChat() bool {
 	return strings.HasSuffix(r.RequestPath, "/chat/completions")
 }
 
+func (r *Request) HasError() bool {
+	return !r.ResponseStatusCode.Valid || r.ResponseStatusCode.Int64 >= http.StatusBadRequest || r.Error.Valid
+}
+
 func (r *Request) ChatCmpl() string {
 	if r.IsChat() {
 		return r.MoonshotID.String

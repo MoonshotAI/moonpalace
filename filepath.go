@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -49,4 +50,14 @@ func getPalaceSqlite() string {
 		}
 	}
 	return sqlitePath
+}
+
+func getPalaceServerErrorLog() io.Writer {
+	palaceDir := getPalaceDir()
+	serverErrorLogPath := filepath.Join(palaceDir, "server_error.log")
+	file, err := os.OpenFile(serverErrorLogPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		logFatal(err)
+	}
+	return file
 }

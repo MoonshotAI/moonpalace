@@ -154,7 +154,7 @@ func inspectCommand() *cobra.Command {
 				if _, ok := columns[column]; ok {
 					switch column {
 					case "error":
-						if request.ResponseStatusCode.Int64 != http.StatusOK {
+						if request.HasError() {
 							header = append(header, "error")
 						}
 					case "response_body":
@@ -174,7 +174,7 @@ func inspectCommand() *cobra.Command {
 			for _, column := range header {
 				switch column {
 				case "error":
-					if !request.ResponseStatusCode.Valid || request.ResponseStatusCode.Int64 >= http.StatusBadRequest {
+					if request.HasError() {
 						row = append(row, inspection["error"])
 					}
 				default:

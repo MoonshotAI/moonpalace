@@ -12,13 +12,18 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
+	"github.com/MoonshotAI/moonpalace/detector/repeat"
 	"github.com/spf13/cobra"
 )
 
-var httpProxyKey string
+var (
+	httpProxyKey          string
+	httpProxyDetectRepeat bool
+)
 
 func startCommand() *cobra.Command {
 	var (
@@ -54,6 +59,7 @@ func startCommand() *cobra.Command {
 	flags := cmd.PersistentFlags()
 	flags.Int16VarP(&port, "port", "p", 9988, "port to listen on")
 	flags.StringVarP(&httpProxyKey, "key", "k", "", "API key by default")
+	flags.BoolVar(&httpProxyDetectRepeat, "detect-repeat", false, "detect and prevent repeating tokens in streaming output")
 	return cmd
 }
 
@@ -62,9 +68,16 @@ var (
 		Handler:      http.HandlerFunc(proxy),
 		ReadTimeout:  5 * time.Minute,
 		WriteTimeout: 5 * time.Minute,
+		ErrorLog:     serverErrorLogger,
 	}
 	httpClient = &http.Client{
 		Timeout: time.Minute * 5,
+	}
+
+	detectorsPool = &sync.Pool{
+		New: func() any {
+			return make(map[int]*repeat.SuffixAutomaton)
+		},
 	}
 )
 
@@ -188,6 +201,14 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(newResponse.StatusCode)
 	if contentType := filterHeaderFlags(newResponse.Header.Get("Content-Type")); contentType == "text/event-stream" {
+		detectors := detectorsPool.Get().(map[int]*repeat.SuffixAutomaton)
+		defer func() {
+			for index, detector := range detectors {
+				detector.Clear()
+				delete(detectors, index)
+			}
+			detectorsPool.Put(detectorsPool)
+		}()
 		scanner := bufio.NewScanner(newResponse.Body)
 		for scanner.Scan() {
 			line := scanner.Bytes()
@@ -196,8 +217,45 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 			if field, value, ok := bytes.Cut(line, []byte{':'}); ok {
 				field, value = bytes.TrimSpace(field), bytes.TrimSpace(value)
 				if bytes.Equal(field, []byte("data")) && !bytes.Equal(value, []byte("[DONE]")) {
-					if err = json.Unmarshal(value, &moonshot); err == nil && moonshot.ID != "" {
+					var chunk MoonshotChunk
+					if err = json.Unmarshal(value, &chunk); err == nil && chunk.ID != "" {
+						if moonshot == nil {
+							moonshot = new(Moonshot)
+						}
+						moonshot.ID = chunk.ID
 						moonshotID = moonshot.ID
+						if chunk.Choices != nil && len(chunk.Choices) > 0 {
+							for _, choice := range chunk.Choices {
+								var detector *repeat.SuffixAutomaton
+								if _, exists := detectors[choice.Index]; exists {
+									detector = detectors[choice.Index]
+								} else {
+									detector = repeat.NewSuffixAutomaton()
+									detectors[choice.Index] = detector
+								}
+								if choice.Usage != nil {
+									if moonshot.Usage == nil {
+										moonshot.Usage = &MoonshotUsage{
+											PromptTokens:     choice.Usage.PromptTokens,
+											CompletionTokens: choice.Usage.CompletionTokens,
+											TotalTokens:      choice.Usage.TotalTokens,
+										}
+									} else {
+										moonshot.Usage.PromptTokens += choice.Usage.PromptTokens
+										moonshot.Usage.CompletionTokens += choice.Usage.CompletionTokens
+										moonshot.Usage.TotalTokens += choice.Usage.TotalTokens
+									}
+								}
+								if httpProxyDetectRepeat {
+									detector.AddString(choice.Delta.Content)
+									if rep := detector.GetRepeatness(); detector.Length() > 100 && rep < 0.5 {
+										err = errors.New("it appears that there is an issue with content repeating in the current response")
+										w.Write([]byte("[DONE]"))
+										goto FINISHING
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -226,6 +284,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 			moonshotID = moonshot.ID
 		}
 	}
+FINISHING:
 	moonshotGID = newResponse.Header.Get("Msh-Gid")
 	moonshotUID = newResponse.Header.Get("Msh-Uid")
 	moonshotRequestID = newResponse.Header.Get("Msh-Request-Id")
@@ -248,12 +307,25 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 }
 
 type Moonshot struct {
-	ID    string `json:"id"`
-	Usage *struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-		TotalTokens      int `json:"total_tokens"`
-	} `json:"usage"`
+	ID    string         `json:"id"`
+	Usage *MoonshotUsage `json:"usage"`
+}
+
+type MoonshotChunk struct {
+	ID      string `json:"id"`
+	Choices []struct {
+		Index int `json:"index"`
+		Delta struct {
+			Content string `json:"content"`
+		} `json:"delta"`
+		Usage *MoonshotUsage `json:"usage"`
+	} `json:"choices"`
+}
+
+type MoonshotUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }
 
 func isGzip(header http.Header) bool {

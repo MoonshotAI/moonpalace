@@ -114,5 +114,6 @@ func exportCommand() *cobra.Command {
 	cmd.MarkFlagsOneRequired("id", "chatcmpl", "requestid")
 	cmd.MarkFlagsMutuallyExclusive("good", "bad")
 	cmd.MarkPersistentFlagFilename("output")
+	cmd.MarkPersistentFlagDirname("directory")
 	return cmd
 }

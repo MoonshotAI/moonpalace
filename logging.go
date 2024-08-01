@@ -11,7 +11,10 @@ import (
 	"github.com/fatih/color"
 )
 
-var logger = log.New(os.Stderr, boldGreen("[MoonPalace] "), log.LstdFlags)
+var (
+	logger            = log.New(os.Stderr, boldGreen("[MoonPalace] "), log.LstdFlags)
+	serverErrorLogger = log.New(getPalaceServerErrorLog(), "", log.LstdFlags)
+)
 
 var (
 	boldWhite  = color.New(color.FgHiWhite, color.Bold).SprintfFunc()
