@@ -226,13 +226,6 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 						moonshotID = moonshot.ID
 						if chunk.Choices != nil && len(chunk.Choices) > 0 {
 							for _, choice := range chunk.Choices {
-								var detector *repeat.SuffixAutomaton
-								if _, exists := detectors[choice.Index]; exists {
-									detector = detectors[choice.Index]
-								} else {
-									detector = repeat.NewSuffixAutomaton()
-									detectors[choice.Index] = detector
-								}
 								if choice.Usage != nil {
 									if moonshot.Usage == nil {
 										moonshot.Usage = &MoonshotUsage{
@@ -247,6 +240,13 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 									}
 								}
 								if httpProxyDetectRepeat {
+									var detector *repeat.SuffixAutomaton
+									if _, exists := detectors[choice.Index]; exists {
+										detector = detectors[choice.Index]
+									} else {
+										detector = repeat.NewSuffixAutomaton()
+										detectors[choice.Index] = detector
+									}
 									detector.AddString(choice.Delta.Content)
 									if rep := detector.GetRepeatness(); detector.Length() > 100 && rep < 0.5 {
 										err = errors.New("it appears that there is an issue with content repeating in the current response")
