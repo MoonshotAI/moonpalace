@@ -281,8 +281,11 @@ func (r *Request) Metadata() (metadata map[string]string) {
 	if r.MoonshotServerTiming.Valid {
 		metadata["server_timing"] = strconv.FormatInt(r.MoonshotServerTiming.Int64, 10)
 	}
+	if r.RequestContentType.Valid {
+		metadata["request_content_type"] = r.RequestContentType.String
+	}
 	if r.ResponseContentType.Valid {
-		metadata["content_type"] = r.ResponseContentType.String
+		metadata["response_content_type"] = r.ResponseContentType.String
 	}
 	metadata["requested_at"] = r.CreatedAt.Format(time.DateTime)
 	return metadata

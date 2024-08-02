@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -35,17 +34,16 @@ func exportCommand() *cobra.Command {
 				}
 				logFatal(err)
 			}
-			if !request.IsChat() {
-				logFatal(fmt.Errorf("target request(%s) is not a chat", request.Ident()))
-			}
-			switch {
-			case goodCase:
-				request.Category = "goodcase"
-			case badCase:
-				request.Category = "badcase"
-			}
-			if len(tags) > 0 {
-				request.Tags = tags
+			if request.IsChat() {
+				switch {
+				case goodCase:
+					request.Category = "goodcase"
+				case badCase:
+					request.Category = "badcase"
+				}
+				if len(tags) > 0 {
+					request.Tags = tags
+				}
 			}
 			var outputStream io.Writer
 			if directory != "" {

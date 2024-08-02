@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os/signal"
@@ -74,6 +75,7 @@ var (
 		Timeout: time.Minute * 5,
 	}
 
+	loggingMutex  sync.Mutex
 	detectorsPool = &sync.Pool{
 		New: func() any {
 			return make(map[int]*repeat.SuffixAutomaton)
@@ -101,52 +103,56 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		moonshotUID               string
 		moonshotRequestID         string
 		moonshotServerTiming      int
+		moonshotContextCacheID    string
 		responseStatus            string
 		responseStatusCode        int
 		responseContentType       string
 	)
 	defer func() {
-		var lastInsertID int64
-		lastInsertID, err = persistence.Persistence(
-			requestID,
-			requestContentType,
-			requestMethod,
-			requestPath,
-			requestQuery,
-			moonshotID,
-			moonshotGID,
-			moonshotUID,
-			moonshotRequestID,
-			moonshotServerTiming,
-			responseStatusCode,
-			responseContentType,
-			formatHeader(newRequest),
-			string(requestBody),
-			formatHeader(newResponse),
-			string(responseBody),
-			toErrMsg(err),
-		)
-		if err != nil {
-			logFatal(err)
-		}
-		logNewRow(lastInsertID)
-	}()
-	defer func() {
-		logRequest(
-			requestMethod,
-			requestPath,
-			requestQuery,
-			requestContentType,
-			requestID,
-			responseStatus,
-			responseContentType,
-			moonshotRequestID,
-			moonshotServerTiming,
-			moonshotUID,
-			moonshotGID,
-			moonshot,
-			err,
-		)
+		go func() {
+			loggingMutex.Lock()
+			defer loggingMutex.Unlock()
+			logRequest(
+				requestMethod,
+				requestPath,
+				requestQuery,
+				requestContentType,
+				requestID,
+				responseStatus,
+				responseContentType,
+				moonshotRequestID,
+				moonshotServerTiming,
+				moonshotContextCacheID,
+				moonshotUID,
+				moonshotGID,
+				moonshot,
+				err,
+			)
+			var lastInsertID int64
+			lastInsertID, err = persistence.Persistence(
+				requestID,
+				requestContentType,
+				requestMethod,
+				requestPath,
+				requestQuery,
+				moonshotID,
+				moonshotGID,
+				moonshotUID,
+				moonshotRequestID,
+				moonshotServerTiming,
+				responseStatusCode,
+				responseContentType,
+				formatHeader(newRequest),
+				string(requestBody),
+				formatHeader(newResponse),
+				string(responseBody),
+				toErrMsg(err),
+			)
+			if err != nil {
+				logFatal(err)
+			}
+			logNewRow(lastInsertID)
+		}()
 	}()
 	requestBody, err = io.ReadAll(r.Body)
 	if err != nil {
@@ -239,12 +245,17 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 											PromptTokens:     choice.Usage.PromptTokens,
 											CompletionTokens: choice.Usage.CompletionTokens,
 											TotalTokens:      choice.Usage.TotalTokens,
+											CachedTokens:     choice.Usage.CachedTokens,
 										}
 									} else {
 										moonshot.Usage.PromptTokens += choice.Usage.PromptTokens
 										moonshot.Usage.CompletionTokens += choice.Usage.CompletionTokens
 										moonshot.Usage.TotalTokens += choice.Usage.TotalTokens
+										moonshot.Usage.CachedTokens += choice.Usage.CachedTokens
 									}
+								}
+								if choice.FinishReason != nil && *choice.FinishReason == "length" {
+									err = errors.New("it seems that your max_tokens value is too small, please set a larger value")
 								}
 								if httpProxyDetectRepeat {
 									detector.AddString(choice.Delta.Content)
@@ -280,8 +291,29 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if err = json.Unmarshal(responseBody, &moonshot); err == nil && moonshot.ID != "" {
+		var completion MoonshotCompletion
+		if err = json.Unmarshal(responseBody, &completion); err == nil && completion.ID != "" {
+			if moonshot == nil {
+				moonshot = new(Moonshot)
+			}
+			moonshot.ID = completion.ID
 			moonshotID = moonshot.ID
+			if completion.Usage != nil {
+				moonshot.Usage = &MoonshotUsage{
+					PromptTokens:     completion.Usage.PromptTokens,
+					CompletionTokens: completion.Usage.CompletionTokens,
+					TotalTokens:      completion.Usage.TotalTokens,
+					CachedTokens:     completion.Usage.CachedTokens,
+				}
+			}
+			if completion.Choices != nil && len(completion.Choices) > 0 {
+				for _, choice := range completion.Choices {
+					if choice.FinishReason != nil && *choice.FinishReason == "length" {
+						err = fmt.Errorf("it seems that your max_tokens value is too small, please set a value greater than %d",
+							completion.Usage.CompletionTokens)
+					}
+				}
+			}
 		}
 	}
 FINISHING:
@@ -298,6 +330,7 @@ FINISHING:
 			}
 		}
 	}
+	moonshotContextCacheID = newResponse.Header.Get("Msh-Context-Cache-Id")
 	responseStatus = newResponse.Status
 	responseStatusCode = newResponse.StatusCode
 	responseContentType = filterHeaderFlags(newResponse.Header.Get("Content-Type"))
@@ -311,21 +344,31 @@ type Moonshot struct {
 	Usage *MoonshotUsage `json:"usage"`
 }
 
-type MoonshotChunk struct {
-	ID      string `json:"id"`
-	Choices []struct {
-		Index int `json:"index"`
-		Delta struct {
-			Content string `json:"content"`
-		} `json:"delta"`
-		Usage *MoonshotUsage `json:"usage"`
-	} `json:"choices"`
+type MoonshotChunk = MoonshotCompletion
+
+type MoonshotCompletion struct {
+	ID      string            `json:"id"`
+	Choices []*MoonshotChoice `json:"choices"`
+	Usage   *MoonshotUsage    `json:"usage"`
+}
+
+type MoonshotChoice struct {
+	Index        int              `json:"index"`
+	Delta        *MoonshotMessage `json:"delta"`
+	Message      *MoonshotMessage `json:"message"`
+	FinishReason *string          `json:"finish_reason"`
+	Usage        *MoonshotUsage   `json:"usage"`
+}
+
+type MoonshotMessage struct {
+	Content string `json:"content"`
 }
 
 type MoonshotUsage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
+	CachedTokens     int `json:"cached_tokens"`
 }
 
 func isGzip(header http.Header) bool {

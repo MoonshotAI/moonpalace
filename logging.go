@@ -38,6 +38,7 @@ func logRequest(
 	responseContentType string,
 	moonshotRequestID string,
 	moonshotServerTiming int,
+	moonshotContextCacheID string,
 	moonshotUID string,
 	moonshotGID string,
 	moonshot *Moonshot,
@@ -56,12 +57,15 @@ func logRequest(
 	}
 	if moonshotRequestID != "" {
 		logger.Printf("  - Response Headers: \n")
-		logger.Printf("    - Content-Type:   %s\n", responseContentType)
-		logger.Printf("    - Msh-Request-Id: %s\n", moonshotRequestID)
-		logger.Printf("    - Server-Timing:  %d\n", moonshotServerTiming)
+		logger.Printf("    - Content-Type:          %s\n", responseContentType)
+		logger.Printf("    - Msh-Request-Id:        %s\n", moonshotRequestID)
+		logger.Printf("    - Server-Timing:         %d\n", moonshotServerTiming)
+		if moonshotContextCacheID != "" {
+			logger.Printf("    - Msh-Context-Cache-Id:  %s\n", moonshotContextCacheID)
+		}
 		if moonshotUID != "" {
-			logger.Printf("    - Msh-Uid:        %s\n", moonshotUID)
-			logger.Printf("    - Msh-Gid:        %s\n", moonshotGID)
+			logger.Printf("    - Msh-Uid:               %s\n", moonshotUID)
+			logger.Printf("    - Msh-Gid:               %s\n", moonshotGID)
 			if moonshot != nil && moonshot.ID != "" {
 				logger.Printf("  - Response: \n")
 				logger.Printf("    - id:                %s\n", moonshot.ID)
@@ -69,6 +73,9 @@ func logRequest(
 					logger.Printf("    - prompt_tokens:     %d\n", usage.PromptTokens)
 					logger.Printf("    - completion_tokens: %d\n", usage.CompletionTokens)
 					logger.Printf("    - total_tokens:      %d\n", usage.TotalTokens)
+					if usage.CachedTokens > 0 {
+						logger.Printf("    - cached_tokens:     %d\n", usage.CachedTokens)
+					}
 				}
 			}
 		}
