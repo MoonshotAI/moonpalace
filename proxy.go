@@ -22,8 +22,10 @@ import (
 )
 
 var (
-	httpProxyKey          string
-	httpProxyDetectRepeat bool
+	httpProxyKey             string
+	httpProxyDetectRepeat    bool
+	httpProxyRepeatThreshold float64
+	httpProxyRepeatMinLength int32
 )
 
 func startCommand() *cobra.Command {
@@ -61,6 +63,8 @@ func startCommand() *cobra.Command {
 	flags.Int16VarP(&port, "port", "p", 9988, "port to listen on")
 	flags.StringVarP(&httpProxyKey, "key", "k", "", "API key by default")
 	flags.BoolVar(&httpProxyDetectRepeat, "detect-repeat", false, "detect and prevent repeating tokens in streaming output")
+	flags.Float64Var(&httpProxyRepeatThreshold, "repeat-threshold", 0.5, "repeat threshold, a float between [0, 1]")
+	flags.Int32Var(&httpProxyRepeatMinLength, "repeat-min-length", 100, "repeat min length, minimum string length to detect repeat")
 	return cmd
 }
 
@@ -232,13 +236,6 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 						moonshotID = moonshot.ID
 						if chunk.Choices != nil && len(chunk.Choices) > 0 {
 							for _, choice := range chunk.Choices {
-								var detector *repeat.SuffixAutomaton
-								if _, exists := detectors[choice.Index]; exists {
-									detector = detectors[choice.Index]
-								} else {
-									detector = repeat.NewSuffixAutomaton()
-									detectors[choice.Index] = detector
-								}
 								if choice.Usage != nil {
 									if moonshot.Usage == nil {
 										moonshot.Usage = &MoonshotUsage{
@@ -256,8 +253,15 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 									err = errors.New("it seems that your max_tokens value is too small, please set a larger value")
 								}
 								if httpProxyDetectRepeat {
+									var detector *repeat.SuffixAutomaton
+									if _, exists := detectors[choice.Index]; exists {
+										detector = detectors[choice.Index]
+									} else {
+										detector = repeat.NewSuffixAutomaton()
+										detectors[choice.Index] = detector
+									}
 									detector.AddString(choice.Delta.Content)
-									if rep := detector.GetRepeatness(); detector.Length() > 100 && rep < 0.5 {
+									if detector.Length() > httpProxyRepeatMinLength && detector.GetRepeatness() < httpProxyRepeatThreshold {
 										err = errors.New("it appears that there is an issue with content repeating in the current response")
 										w.Write([]byte("[DONE]"))
 										goto FINISHING

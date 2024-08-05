@@ -119,6 +119,6 @@ func (sam *SuffixAutomaton) GetRepeatness() float64 {
 	return float64(z) / float64(n*(n+1)/2)
 }
 
-func (sam *SuffixAutomaton) Length() int {
-	return int(sam.n)
+func (sam *SuffixAutomaton) Length() int32 {
+	return sam.n
 }
