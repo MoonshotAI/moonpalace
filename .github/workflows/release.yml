@@ -69,6 +69,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-macos-amd64, build-macos-arm64, build-windows, build-linux]
     steps:
+      - uses: actions/github-script@v7
+        id: commit
+        with:
+          script: |
+            const commit = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: '${{ github.ref }}'
+            })
+            return commit.data.commit.message
       - uses: actions/create-release@v1.1.4
         id: release
         env:
@@ -76,12 +86,13 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: ${{ github.ref }}
+          body: ${{ steps.commit.outputs.result }}
           draft: false
           prerelease: false
     outputs:
       upload_url: ${{ steps.release.outputs.upload_url }}
 
-  release:
+  upload-release-asset:
     runs-on: ubuntu-latest
     needs: [build-macos-amd64, build-macos-arm64, build-windows, build-linux, create-release]
     strategy:
