@@ -34,7 +34,7 @@ func startCommand() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "Start the MoonPalace proxy server.",
+		Short: "Start the MoonPalace proxy server",
 		Run: func(cmd *cobra.Command, args []string) {
 			ctx, stop := signal.NotifyContext(context.Background(),
 				syscall.SIGINT,

@@ -25,7 +25,7 @@ func exportCommand() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "export",
-		Short: "export a Moonshot AI request.",
+		Short: "Export a Moonshot AI request",
 		Run: func(cmd *cobra.Command, args []string) {
 			request, err := persistence.GetRequest(id, chatcmpl, requestID)
 			if err != nil {

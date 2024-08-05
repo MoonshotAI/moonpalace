@@ -48,7 +48,7 @@ func listCommand() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Query Moonshot AI requests based on conditions.",
+		Short: "Query Moonshot AI requests based on conditions",
 		Run: func(cmd *cobra.Command, args []string) {
 			requests, err := persistence.ListRequests(n, chatOnly)
 			if err != nil {
@@ -140,7 +140,7 @@ func inspectCommand() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "inspect",
-		Short: "Inspect the specific content of a Moonshot AI request.",
+		Short: "Inspect the specific content of a Moonshot AI request",
 		Run: func(cmd *cobra.Command, args []string) {
 			request, err := persistence.GetRequest(id, chatcmpl, requestID)
 			if err != nil {
@@ -206,7 +206,7 @@ func cleanupCommand() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "cleanup",
-		Short: "Cleanup Moonshot AI requests.",
+		Short: "Cleanup Moonshot AI requests",
 		Run: func(cmd *cobra.Command, args []string) {
 			_, errParseDateOnly := time.Parse(time.DateOnly, before)
 			_, errParseDateTime := time.Parse(time.DateTime, before)
