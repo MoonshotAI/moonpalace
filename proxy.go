@@ -248,10 +248,8 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 											CachedTokens:     choice.Usage.CachedTokens,
 										}
 									} else {
-										moonshot.Usage.PromptTokens += choice.Usage.PromptTokens
 										moonshot.Usage.CompletionTokens += choice.Usage.CompletionTokens
-										moonshot.Usage.TotalTokens += choice.Usage.TotalTokens
-										moonshot.Usage.CachedTokens += choice.Usage.CachedTokens
+										moonshot.Usage.TotalTokens += choice.Usage.CompletionTokens
 									}
 								}
 								if choice.FinishReason != nil && *choice.FinishReason == "length" {
