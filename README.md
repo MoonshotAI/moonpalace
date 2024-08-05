@@ -11,6 +11,8 @@ MoonPalace（月宫）是由 Moonshot AI 月之暗面提供的 API 调试工具�
 - 通过 `request_id`、`chatcmpl_id` 快速检索、查看请求信息；
 - 一键导出 BadCase 结构化上报数据，帮助 Kimi 完善模型能力；
 
+**我们推荐在代码编写和调试阶段使用 MoonPalace 作为你的 API “供应商”，以便能快速发现和定位关于 API 调用和代码编写过程中的各种问题，对于 Kimi 大模型各种不符合预期的输出，你也可以通过 MoonPalace 导出请求详情并提交给 Moonshot AI 以改进 Kimi 大模型。**
+
 ## 安装方式
 
 ### 使用 `go` 命令安装
@@ -53,8 +55,8 @@ Use "moonpalace [command] --help" for more information about a command.
 你可以从 [Releases](https://github.com/MoonshotAI/moonpalace/releases) 页面下载编译好的二进制（可执行）文件：
 
 - moonpalace-linux
-- moonpalace-macos-amd64
-- moonpalace-macos-arm64
+- moonpalace-macos-amd64 => 对应 Intel 版本的 Mac
+- moonpalace-macos-arm64 => 对应 Apple Silicon 版本的 Mac
 - moonpalace-windows.exe
 
 请根据自己的平台下载对应的二进制（可执行）文件，并将二进制（可执行）文件放置在已被包含在环境变量 `$PATH` 中的目录中，将其更名为 `moonpalace`，最后为其赋予可执行权限。
@@ -104,6 +106,37 @@ $ moonpalace start --port <PORT>
 MoonPalace 会以日志的形式将请求的细节在命令行中输出（假如你想将日志的内容持久化存储，你可以将 `stderr` 重定向到文件中）。
 
 注：在日志中，Response Headers 中的 `Msh-Request-Id` 字段的值对应下文中**检索请求**、**导出请求**中的 `--requestid` 参数的值，Response 中的 `id` 对应 `--chatcmpl` 参数的值，`last_insert_id` 对应 `--id` 参数的值。
+
+#### 内容被截断检测
+
+MoonPalace 可以检测当前 Kimi 大模型输出的内容是否被截断、或内容不完整（这一功能默认被启用）。当 MoonPalace 检测到输出的内容被截断或不完整时，会在日志中输出：
+
+```shell
+[MoonPalace] 2024/08/05 19:06:19   it seems that your max_tokens value is too small, please set a larger value
+```
+
+如果当前使用的是非流式输出模式（stream=False），MoonPalace 会给出建议的 `max_tokens` 值。
+
+#### 启用重复内容输出检测
+
+MoonPalace 提供了对 Kimi 大模型重复内容输出的检测功能。重复内容输出指的是：**Kimi 大模型会重复不断地输出某一特定字词、句子以及空白字符，并且在达到 `max_tokens` 限制前不会停下来。**在使用 `moonshot-v1-128k` 等费用较高的模型时，这种重复输出会导致额外的 Tokens 费用消耗，因此 MoonPalace 提供了 `--detect-repeat` 选项以启用重复内容输出检测，如下所示：
+
+```shell
+$ moonpalace start --port <PORT> --detect-repeat --repeat-threshold 0.3 --repeat-min-length 20
+```
+
+启用 `--detect-repeat` 选项后，MoonPalace 会在检测到 Kimi 大模型的重复内容输出行为时，中断 Kimi 大模型输出，并在日志中输出：
+
+```shell
+[MoonPalace] 2024/08/05 18:20:37   it appears that there is an issue with content repeating in the current response
+```
+
+_注：启用 `--detect-repeat` 后，仅在流式输出（stream=True）的场合，MoonPalace 会中断 Kimi 大模型的输出，非流式输出场合不适用。_
+
+你可以使用 `--repeat-threshold`/`--repeat-min-length` 参数来调整 MoonPalace 的阻断行为：
+
+* `--repeat-threshold` 参数用于设置 MoonPalace 对重复内容的容忍度，越高的 threshold 表示容忍度越低，重复内容将更快被阻断，0 <= threshold <= 1
+* `--repeat-min-length` 参数用于设置 MoonPalace 检测重复内容输出的起始字符数量，例如：--repeat-min-length=100 表示当输出的 utf-8 字符数超过 100 时开启重复检测，输出字符数小于 100 时不开启重复内容输出检测
 
 ### 检索请求
 
@@ -202,115 +235,14 @@ $ cat $HOME/Downloads/chatcmpl-2e1aa823e2c94ebdad66450a0e6df088.json
         "url": "https://api.moonshot.cn/v1/chat/completions",
         "header": "Accept: application/json\r\nAccept-Encoding: gzip\r\nConnection: keep-alive\r\nContent-Length: 2450\r\nContent-Type: application/json\r\nUser-Agent: OpenAI/Python 1.36.1\r\nX-Stainless-Arch: arm64\r\nX-Stainless-Async: false\r\nX-Stainless-Lang: python\r\nX-Stainless-Os: MacOS\r\nX-Stainless-Package-Version: 1.36.1\r\nX-Stainless-Runtime: CPython\r\nX-Stainless-Runtime-Version: 3.11.6\r\n",
         "body":
-        {
-            "messages":
-            [
-                {
-                    "role": "system",
-                    "content": "你是 Kimi，由 Moonshot AI 提供的人工智能助手，你更擅长中文和英文的对话。你会为用户提供安全，有帮助，准确的回答。同时，你会拒绝一切涉及恐怖主义，种族歧视，黄色暴力等问题的回答。Moonshot AI 为专有名词，不可翻译成其他语言。"
-                },
-                {
-                    "role": "user",
-                    "content": "请联网搜索 Context Caching，并告诉我它是什么。"
-                }
-            ],
-            "model": "moonshot-v1-8k",
-            "temperature": 0.3,
-            "tools":
-            [
-                {
-                    "type": "function",
-                    "function":
-                    {
-                        "name": "search",
-                        "description": " \n\t\t\t\t通过搜索引擎搜索互联网上的内容。\n\n\t\t\t\t当你的知识无法回答用户提出的问题，或用户请求你进行联网搜索时，调用此工具。请从与用户的对话中提取用户想要搜索的内容作为 query 参数的值。\n\t\t\t\t搜索结果包含网站的标题、网站的地址（URL）以及网站简介。\n\t\t\t",
-                        "parameters":
-                        {
-                            "type": "object",
-                            "required":
-                            [
-                                "query"
-                            ],
-                            "properties":
-                            {
-                                "query":
-                                {
-                                    "type": "string",
-                                    "description": "\n\t\t\t\t\t\t\t用户搜索的内容，请从用户的提问或聊天上下文中提取。\n\t\t\t\t\t\t"
-                                }
-                            }
-                        }
-                    }
-                },
-                {
-                    "type": "function",
-                    "function":
-                    {
-                        "name": "crawl",
-                        "description": "\n\t\t\t\t根据网站地址（URL）获取网页内容。\n\t\t\t",
-                        "parameters":
-                        {
-                            "type": "object",
-                            "required":
-                            [
-                                "url"
-                            ],
-                            "properties":
-                            {
-                                "url":
-                                {
-                                    "type": "string",
-                                    "description": "\n\t\t\t\t\t\t\t需要获取内容的网站地址（URL），通常情况下从搜索结果中可以获取网站的地址。\n\t\t\t\t\t\t"
-                                }
-                            }
-                        }
-                    }
-                }
-            ]
-        }
+        {}
     },
     "response":
     {
         "status": "200 OK",
         "header": "Content-Encoding: gzip\r\nContent-Type: application/json; charset=utf-8\r\nDate: Mon, 29 Jul 2024 13:30:43 GMT\r\nMsh-Cache: updated\r\nMsh-Gid: enterprise-tier-5\r\nMsh-Request-Id: c07c118e-4dae-11ef-b423-62db244b9277\r\nMsh-Trace-Mode: on\r\nMsh-Uid: cn0psmmcp7fclnphkcpg\r\nServer: nginx\r\nServer-Timing: inner; dur=1033\r\nStrict-Transport-Security: max-age=15724800; includeSubDomains\r\nVary: Accept-Encoding\r\nVary: Origin\r\n",
         "body":
-        {
-            "id": "chatcmpl-2e1aa823e2c94ebdad66450a0e6df088",
-            "object": "chat.completion",
-            "created": 1722259842,
-            "model": "moonshot-v1-8k",
-            "choices":
-            [
-                {
-                    "index": 0,
-                    "message":
-                    {
-                        "role": "assistant",
-                        "content": "",
-                        "tool_calls":
-                        [
-                            {
-                                "index": 0,
-                                "id": "search:0",
-                                "type": "function",
-                                "function":
-                                {
-                                    "name": "search",
-                                    "arguments": "{\n    \"query\": \"Context Caching\"\n}"
-                                }
-                            }
-                        ]
-                    },
-                    "finish_reason": "tool_calls"
-                }
-            ],
-            "usage":
-            {
-                "prompt_tokens": 278,
-                "completion_tokens": 13,
-                "total_tokens": 291
-            }
-        }
+        {}
     },
     "category": "goodcase",
     "tags":
