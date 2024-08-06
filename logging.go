@@ -36,6 +36,7 @@ func logRequest(
 	requestID string,
 	responseStatus string,
 	responseContentType string,
+	responseTTFT int,
 	moonshotRequestID string,
 	moonshotServerTiming int,
 	moonshotContextCacheID string,
@@ -69,6 +70,9 @@ func logRequest(
 			if moonshot != nil && moonshot.ID != "" {
 				logger.Printf("  - Response: \n")
 				logger.Printf("    - id:                %s\n", moonshot.ID)
+				if responseTTFT > 0 {
+					logger.Printf("    - ttft:              %d\n", responseTTFT)
+				}
 				if usage := moonshot.Usage; usage != nil {
 					logger.Printf("    - prompt_tokens:     %d\n", usage.PromptTokens)
 					logger.Printf("    - completion_tokens: %d\n", usage.CompletionTokens)

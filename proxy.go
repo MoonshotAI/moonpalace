@@ -39,9 +39,6 @@ func startCommand() *cobra.Command {
 				syscall.SIGINT,
 				syscall.SIGTERM)
 			defer stop()
-			if err := persistence.createTable(ctx); err != nil {
-				logFatal(err)
-			}
 			httpServer.Handler = http.HandlerFunc(buildProxy(
 				key,
 				detectRepeat,
@@ -129,6 +126,8 @@ func buildProxy(
 			responseStatus            string
 			responseStatusCode        int
 			responseContentType       string
+			responseTTFT              int
+			createdAt                 = time.Now()
 		)
 		defer func() {
 			go func() {
@@ -142,6 +141,7 @@ func buildProxy(
 					requestID,
 					responseStatus,
 					responseContentType,
+					responseTTFT,
 					moonshotRequestID,
 					moonshotServerTiming,
 					moonshotContextCacheID,
@@ -169,6 +169,8 @@ func buildProxy(
 					formatHeader(newResponse),
 					string(responseBody),
 					toErrMsg(err),
+					responseTTFT,
+					createdAt.Format(time.DateTime),
 				)
 				if err != nil {
 					logFatal(err)
@@ -224,6 +226,7 @@ func buildProxy(
 		} else {
 			newRequest.Header.Del("Accept-Encoding")
 		}
+		createdAt = time.Now()
 		newResponse, err = httpClient.Do(newRequest)
 		if err != nil {
 			writeProxyError(encoder, "send_new_request", err)
@@ -279,6 +282,9 @@ func buildProxy(
 							moonshotID = moonshot.ID
 							if chunk.Choices != nil && len(chunk.Choices) > 0 {
 								for _, choice := range chunk.Choices {
+									if choice.Delta.Content != "" && responseTTFT == 0 {
+										responseTTFT = int(time.Since(createdAt) / time.Millisecond)
+									}
 									if choice.Usage != nil {
 										if moonshot.Usage == nil {
 											moonshot.Usage = &MoonshotUsage{

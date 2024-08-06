@@ -69,12 +69,13 @@ var (
 
 	__PersistenceBaseTemplate = template.Must(template.New("PersistenceBaseTemplate").Funcs(template.FuncMap{"bindvars": __PersistenceBindVars}).Parse(""))
 
-	sqlTmplPersistence  = template.Must(__PersistenceBaseTemplate.New("Persistence").Parse("insert into moonshot_requests ( request_method, request_path, request_query {{ if .requestContentType }},request_content_type{{ end }} {{ if .requestID }},request_id{{ end }} {{ if .moonshotID }},moonshot_id{{ end }} {{ if .moonshotGID }},moonshot_gid{{ end }} {{ if .moonshotUID }},moonshot_uid{{ end }} {{ if .moonshotRequestID }},moonshot_request_id{{ end }} {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }} {{ if .responseStatusCode }},response_status_code{{ end }} {{ if .responseContentType }},response_content_type{{ end }} {{ if .requestHeader }},request_header{{ end }} {{ if .requestBody }},request_body{{ end }} {{ if .responseHeader }},response_header{{ end }} {{ if .responseBody }},response_body{{ end }} {{ if .programError }},error{{ end }} ) values ( :requestMethod, :requestPath, :requestQuery {{ if .requestContentType }},:requestContentType{{ end }} {{ if .requestID }},:requestID{{ end }} {{ if .moonshotID }},:moonshotID{{ end }} {{ if .moonshotGID }},:moonshotGID{{ end }} {{ if .moonshotUID }},:moonshotUID{{ end }} {{ if .moonshotRequestID }},:moonshotRequestID{{ end }} {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }} {{ if .responseStatusCode }},:responseStatusCode{{ end }} {{ if .responseContentType }},:responseContentType{{ end }} {{ if .requestHeader }},:requestHeader{{ end }} {{ if .requestBody }},:requestBody{{ end }} {{ if .responseHeader }},:responseHeader{{ end }} {{ if .responseBody }},:responseBody{{ end }} {{ if .programError }},:programError{{ end }} );\r\nselect last_insert_rowid();\r\n"))
+	sqlTmpladdTTFTField = template.Must(__PersistenceBaseTemplate.New("addTTFTField").Parse("alter table moonshot_requests add response_ttft integer;\r\n"))
+	sqlTmplPersistence  = template.Must(__PersistenceBaseTemplate.New("Persistence").Parse("insert into moonshot_requests ( request_method, request_path, request_query, created_at {{ if .requestContentType }},request_content_type{{ end }} {{ if .requestID }},request_id{{ end }} {{ if .moonshotID }},moonshot_id{{ end }} {{ if .moonshotGID }},moonshot_gid{{ end }} {{ if .moonshotUID }},moonshot_uid{{ end }} {{ if .moonshotRequestID }},moonshot_request_id{{ end }} {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }} {{ if .responseStatusCode }},response_status_code{{ end }} {{ if .responseContentType }},response_content_type{{ end }} {{ if .requestHeader }},request_header{{ end }} {{ if .requestBody }},request_body{{ end }} {{ if .responseHeader }},response_header{{ end }} {{ if .responseBody }},response_body{{ end }} {{ if .programError }},error{{ end }} {{ if .responseTTFT }},response_ttft{{ end }} ) values ( :requestMethod, :requestPath, :requestQuery, :createdAt {{ if .requestContentType }},:requestContentType{{ end }} {{ if .requestID }},:requestID{{ end }} {{ if .moonshotID }},:moonshotID{{ end }} {{ if .moonshotGID }},:moonshotGID{{ end }} {{ if .moonshotUID }},:moonshotUID{{ end }} {{ if .moonshotRequestID }},:moonshotRequestID{{ end }} {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }} {{ if .responseStatusCode }},:responseStatusCode{{ end }} {{ if .responseContentType }},:responseContentType{{ end }} {{ if .requestHeader }},:requestHeader{{ end }} {{ if .requestBody }},:requestBody{{ end }} {{ if .responseHeader }},:responseHeader{{ end }} {{ if .responseBody }},:responseBody{{ end }} {{ if .programError }},:programError{{ end }} {{ if .responseTTFT }},:responseTTFT{{ end }} );\r\nselect last_insert_rowid();\r\n"))
 	sqlTmplListRequests = template.Must(__PersistenceBaseTemplate.New("ListRequests").Parse("select * from moonshot_requests where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} order by id desc limit :n;\r\n"))
 	sqlTmplGetRequest   = template.Must(__PersistenceBaseTemplate.New("GetRequest").Parse("select * from moonshot_requests where 1 = 1 {{ if .id }} and id = :id {{ end }} {{ if .chatcmpl }} and moonshot_id = :chatcmpl {{ end }} {{ if .requestid }} and moonshot_request_id = :requestid {{ end }} ;\r\n"))
 )
 
-func (__imp *implPersistence) createTable(ctx context.Context) error {
+func (__imp *implPersistence) createTable() error {
 	var (
 		errcreateTable     error
 		argListcreateTable = make(__PersistenceArguments, 0, 8)
@@ -84,7 +85,7 @@ func (__imp *implPersistence) createTable(ctx context.Context) error {
 
 	querycreateTable := "create table if not exists moonshot_requests ( id                     integer not null constraint moonshot_requests_pk primary key autoincrement, request_method         text    not null, request_path           text    not null, request_query          text    not null, request_content_type   text, request_id             text, moonshot_id            text, moonshot_gid           text, moonshot_uid           text, moonshot_request_id    text, moonshot_server_timing integer, response_status_code   integer, response_content_type  text, request_header         text, request_body           text, response_header        text, response_body          text, error                  text, created_at             text default (datetime('now', 'localtime')) not null );\r\n"
 
-	txcreateTable, errcreateTable := __imp.__core.BeginTxx(ctx, nil)
+	txcreateTable, errcreateTable := __imp.__core.Beginx()
 	if errcreateTable != nil {
 		return fmt.Errorf("error creating %s transaction: %w", strconv.Quote("createTable"), errcreateTable)
 	}
@@ -101,7 +102,7 @@ func (__imp *implPersistence) createTable(ctx context.Context) error {
 
 		countcreateTable := __PersistenceCount(splitSqlcreateTable, "?")
 
-		_, errcreateTable = txcreateTable.ExecContext(ctx, splitSqlcreateTable, argscreateTable[offsetcreateTable:offsetcreateTable+countcreateTable]...)
+		_, errcreateTable = txcreateTable.Exec(splitSqlcreateTable, argscreateTable[offsetcreateTable:offsetcreateTable+countcreateTable]...)
 
 		if errcreateTable != nil {
 			return fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("createTable"), splitSqlcreateTable, errcreateTable)
@@ -113,6 +114,109 @@ func (__imp *implPersistence) createTable(ctx context.Context) error {
 	if !__imp.__withTx {
 		if errcreateTable := txcreateTable.Commit(); errcreateTable != nil {
 			return fmt.Errorf("error committing %s transaction: %w", strconv.Quote("createTable"), errcreateTable)
+		}
+	}
+
+	return nil
+}
+
+func (__imp *implPersistence) inspectTable() ([]*tableInfo, error) {
+	var (
+		v0inspectTable      []*tableInfo
+		errinspectTable     error
+		argListinspectTable = make(__PersistenceArguments, 0, 8)
+	)
+
+	argListinspectTable = __PersistenceArguments{}
+
+	queryinspectTable := "pragma table_info(moonshot_requests);\r\n"
+
+	txinspectTable, errinspectTable := __imp.__core.Beginx()
+	if errinspectTable != nil {
+		return v0inspectTable, fmt.Errorf("error creating %s transaction: %w", strconv.Quote("inspectTable"), errinspectTable)
+	}
+	if !__imp.__withTx {
+		defer txinspectTable.Rollback()
+	}
+
+	offsetinspectTable := 0
+	argsinspectTable := __PersistenceMergeArgs(argListinspectTable...)
+
+	sqlSliceinspectTable := __PersistenceSplit(queryinspectTable, ";")
+	for indexinspectTable, splitSqlinspectTable := range sqlSliceinspectTable {
+		_ = indexinspectTable
+
+		countinspectTable := __PersistenceCount(splitSqlinspectTable, "?")
+
+		if indexinspectTable < len(sqlSliceinspectTable)-1 {
+			_, errinspectTable = txinspectTable.Exec(splitSqlinspectTable, argsinspectTable[offsetinspectTable:offsetinspectTable+countinspectTable]...)
+		} else {
+			errinspectTable = txinspectTable.Select(&v0inspectTable, splitSqlinspectTable, argsinspectTable[offsetinspectTable:offsetinspectTable+countinspectTable]...)
+		}
+
+		if errinspectTable != nil {
+			return v0inspectTable, fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("inspectTable"), splitSqlinspectTable, errinspectTable)
+		}
+
+		offsetinspectTable += countinspectTable
+	}
+
+	if !__imp.__withTx {
+		if errinspectTable := txinspectTable.Commit(); errinspectTable != nil {
+			return v0inspectTable, fmt.Errorf("error committing %s transaction: %w", strconv.Quote("inspectTable"), errinspectTable)
+		}
+	}
+
+	return v0inspectTable, nil
+}
+
+func (__imp *implPersistence) addTTFTField() error {
+	var (
+		erraddTTFTField     error
+		argListaddTTFTField = make(__PersistenceArguments, 0, 8)
+	)
+
+	argListaddTTFTField = __PersistenceArguments{}
+
+	sqladdTTFTField := __PersistenceGetBuffer()
+	defer __PersistencePutBuffer(sqladdTTFTField)
+	defer sqladdTTFTField.Reset()
+
+	if erraddTTFTField = sqlTmpladdTTFTField.Execute(sqladdTTFTField, map[string]any{}); erraddTTFTField != nil {
+		return fmt.Errorf("error executing %s template: %w", strconv.Quote("addTTFTField"), erraddTTFTField)
+	}
+
+	queryaddTTFTField := sqladdTTFTField.String()
+
+	txaddTTFTField, erraddTTFTField := __imp.__core.Beginx()
+	if erraddTTFTField != nil {
+		return fmt.Errorf("error creating %s transaction: %w", strconv.Quote("addTTFTField"), erraddTTFTField)
+	}
+	if !__imp.__withTx {
+		defer txaddTTFTField.Rollback()
+	}
+
+	offsetaddTTFTField := 0
+	argsaddTTFTField := __PersistenceMergeArgs(argListaddTTFTField...)
+
+	sqlSliceaddTTFTField := __PersistenceSplit(queryaddTTFTField, ";")
+	for indexaddTTFTField, splitSqladdTTFTField := range sqlSliceaddTTFTField {
+		_ = indexaddTTFTField
+
+		countaddTTFTField := __PersistenceCount(splitSqladdTTFTField, "?")
+
+		_, erraddTTFTField = txaddTTFTField.Exec(splitSqladdTTFTField, argsaddTTFTField[offsetaddTTFTField:offsetaddTTFTField+countaddTTFTField]...)
+
+		if erraddTTFTField != nil {
+			return fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("addTTFTField"), splitSqladdTTFTField, erraddTTFTField)
+		}
+
+		offsetaddTTFTField += countaddTTFTField
+	}
+
+	if !__imp.__withTx {
+		if erraddTTFTField := txaddTTFTField.Commit(); erraddTTFTField != nil {
+			return fmt.Errorf("error committing %s transaction: %w", strconv.Quote("addTTFTField"), erraddTTFTField)
 		}
 	}
 
@@ -171,7 +275,7 @@ func (__imp *implPersistence) Cleanup(before string) (sql.Result, error) {
 	return v0Cleanup, nil
 }
 
-func (__imp *implPersistence) Persistence(requestID string, requestContentType string, requestMethod string, requestPath string, requestQuery string, moonshotID string, moonshotGID string, moonshotUID string, moonshotRequestID string, moonshotServerTiming int, responseStatusCode int, responseContentType string, requestHeader string, requestBody string, responseHeader string, responseBody string, programError string) (int64, error) {
+func (__imp *implPersistence) Persistence(requestID string, requestContentType string, requestMethod string, requestPath string, requestQuery string, moonshotID string, moonshotGID string, moonshotUID string, moonshotRequestID string, moonshotServerTiming int, responseStatusCode int, responseContentType string, requestHeader string, requestBody string, responseHeader string, responseBody string, programError string, responseTTFT int, createdAt string) (int64, error) {
 	var (
 		v0Persistence  int64
 		errPersistence error
@@ -199,6 +303,8 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 		"responseHeader":       responseHeader,
 		"responseBody":         responseBody,
 		"programError":         programError,
+		"responseTTFT":         responseTTFT,
+		"createdAt":            createdAt,
 	}); errPersistence != nil {
 		return v0Persistence, fmt.Errorf("error executing %s template: %w", strconv.Quote("Persistence"), errPersistence)
 	}
@@ -231,6 +337,8 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 		"responseHeader":       responseHeader,
 		"responseBody":         responseBody,
 		"programError":         programError,
+		"responseTTFT":         responseTTFT,
+		"createdAt":            createdAt,
 	})
 
 	sqlSlicePersistence := __PersistenceSplit(queryPersistence, ";")

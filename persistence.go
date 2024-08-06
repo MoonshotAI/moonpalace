@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -22,6 +21,34 @@ func init() {
 		sqlDriver,
 		"file:"+getPalaceSqlite(),
 	)
+	if err := persistence.createTable(); err != nil {
+		logFatal(err)
+	}
+	if err := addTTFTField(); err != nil {
+		logFatal(err)
+	}
+}
+
+func addTTFTField() error {
+	tableInfos, err := persistence.inspectTable()
+	if err != nil {
+		return err
+	}
+	for _, info := range tableInfos {
+		if info.Name == "response_ttft" {
+			return nil
+		}
+	}
+	return persistence.addTTFTField()
+}
+
+type tableInfo struct {
+	CID          int64          `db:"cid"`
+	Name         string         `db:"name"`
+	Type         string         `db:"type"`
+	NotNull      bool           `db:"notnull"`
+	DefaultValue sql.NullString `db:"dflt_value"`
+	PrimaryKey   bool           `db:"pk"`
 }
 
 //go:generate defc generate --features sqlx/nort
@@ -53,7 +80,15 @@ type Persistence interface {
 			created_at             text default (datetime('now', 'localtime')) not null
 		);
 	*/
-	createTable(ctx context.Context) error
+	createTable() error
+
+	// inspectTable query const
+	// pragma table_info(moonshot_requests);
+	inspectTable() ([]*tableInfo, error)
+
+	// addTTFTField exec
+	// alter table moonshot_requests add response_ttft integer;
+	addTTFTField() error
 
 	// Cleanup exec named const
 	// delete from moonshot_requests where created_at < :before;
@@ -64,7 +99,8 @@ type Persistence interface {
 		insert into moonshot_requests (
 			request_method,
 		    request_path,
-			request_query
+			request_query,
+			created_at
 			{{ if .requestContentType }},request_content_type{{ end }}
 		    {{ if .requestID }},request_id{{ end }}
 		    {{ if .moonshotID }},moonshot_id{{ end }}
@@ -79,10 +115,12 @@ type Persistence interface {
 		    {{ if .responseHeader }},response_header{{ end }}
 		    {{ if .responseBody }},response_body{{ end }}
 		    {{ if .programError }},error{{ end }}
+		    {{ if .responseTTFT }},response_ttft{{ end }}
 		) values (
 			:requestMethod,
 		    :requestPath,
-			:requestQuery
+			:requestQuery,
+			:createdAt
 			{{ if .requestContentType }},:requestContentType{{ end }}
 		    {{ if .requestID }},:requestID{{ end }}
 		    {{ if .moonshotID }},:moonshotID{{ end }}
@@ -97,6 +135,7 @@ type Persistence interface {
 		    {{ if .responseHeader }},:responseHeader{{ end }}
 		    {{ if .responseBody }},:responseBody{{ end }}
 		    {{ if .programError }},:programError{{ end }}
+		    {{ if .responseTTFT }},:responseTTFT{{ end }}
 		);
 	*/
 	// select last_insert_rowid();
@@ -118,6 +157,8 @@ type Persistence interface {
 		responseHeader string,
 		responseBody string,
 		programError string,
+		responseTTFT int,
+		createdAt string,
 	) (pid int64, err error)
 
 	// ListRequests query many named
@@ -174,6 +215,7 @@ type Request struct {
 	RequestBody          sql.NullString `db:"request_body"`
 	ResponseHeader       sql.NullString `db:"response_header"`
 	ResponseBody         sql.NullString `db:"response_body"`
+	ResponseTTFT         sql.NullInt64  `db:"response_ttft"`
 	Error                sql.NullString `db:"error"`
 	CreatedAt            SqliteTime     `db:"created_at"`
 
@@ -286,6 +328,9 @@ func (r *Request) Metadata() (metadata map[string]string) {
 	}
 	if r.ResponseContentType.Valid {
 		metadata["response_content_type"] = r.ResponseContentType.String
+	}
+	if r.ResponseTTFT.Valid {
+		metadata["response_ttft"] = strconv.FormatInt(r.ResponseTTFT.Int64, 10)
 	}
 	metadata["requested_at"] = r.CreatedAt.Format(time.DateTime)
 	return metadata
