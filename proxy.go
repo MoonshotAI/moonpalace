@@ -312,7 +312,7 @@ func buildProxy(
 										detector.AddString(choice.Delta.Content)
 										if detector.Length() > repeatMinLength && detector.GetRepeatness() < repeatThreshold {
 											err = errors.New("it appears that there is an issue with content repeating in the current response")
-											if forceStream && !requestUseStream {
+											if !(forceStream && !requestUseStream) {
 												w.Write([]byte("[DONE]"))
 											}
 											break READLINES
@@ -515,11 +515,13 @@ func toErrMsg(err error) string {
 
 var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
 
+const streamOptions = `"stream":true,"stream_options":{"include_usage":true},`
+
 func forceUseStream(data []byte) []byte {
 	if !json.Valid(data) {
 		return data
 	}
-	newData := make([]byte, 0, len(data)+len(`"stream":true,`))
+	newData := make([]byte, 0, len(data)+len(streamOptions))
 	insertIndex := 0
 	for i, b := range data {
 		if asciiSpace[b] == 1 {
@@ -531,7 +533,7 @@ func forceUseStream(data []byte) []byte {
 		}
 	}
 	newData = append(newData, '{')
-	newData = append(newData, `"stream":true,`...)
+	newData = append(newData, streamOptions...)
 	newData = append(newData, data[insertIndex:]...)
 	return newData
 }
