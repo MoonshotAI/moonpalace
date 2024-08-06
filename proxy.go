@@ -88,11 +88,31 @@ var (
 			return make(map[int]*repeat.SuffixAutomaton)
 		},
 	}
+	completionPool = &sync.Pool{
+		New: func() any {
+			return make(map[string]any)
+		},
+	}
 	merger = &merge.Merger{
 		StreamFields: []string{"content", "arguments"},
 		IndexFields:  []string{"index"},
 	}
 )
+
+func putDetectors(detectors map[int]*repeat.SuffixAutomaton) {
+	for index, detector := range detectors {
+		detector.Clear()
+		delete(detectors, index)
+	}
+	detectorsPool.Put(detectors)
+}
+
+func putCompletion(completion map[string]any) {
+	for objectKey := range completion {
+		delete(completion, objectKey)
+	}
+	completionPool.Put(completion)
+}
 
 func buildProxy(
 	key string,
@@ -241,18 +261,13 @@ func buildProxy(
 		w.WriteHeader(newResponse.StatusCode)
 		if contentType := filterHeaderFlags(newResponse.Header.Get("Content-Type")); contentType == "text/event-stream" {
 			detectors := detectorsPool.Get().(map[int]*repeat.SuffixAutomaton)
-			defer func() {
-				for index, detector := range detectors {
-					detector.Clear()
-					delete(detectors, index)
-				}
-				detectorsPool.Put(detectorsPool)
-			}()
-			scanner := bufio.NewScanner(newResponse.Body)
+			defer putDetectors(detectors)
 			var completion map[string]any
 			if forceStream && !requestUseStream {
-				completion = make(map[string]any)
+				completion = completionPool.Get().(map[string]any)
+				defer putCompletion(completion)
 			}
+			scanner := bufio.NewScanner(newResponse.Body)
 		READLINES:
 			for scanner.Scan() {
 				line := scanner.Bytes()
@@ -266,12 +281,13 @@ func buildProxy(
 					field, value = bytes.TrimSpace(field), bytes.TrimSpace(value)
 					if bytes.Equal(field, []byte("data")) && !bytes.Equal(value, []byte("[DONE]")) {
 						if forceStream && !requestUseStream {
-							var chunk map[string]any
+							chunk := completionPool.Get().(map[string]any)
 							decoder := json.NewDecoder(bytes.NewReader(value))
 							decoder.UseNumber()
 							if err = decoder.Decode(&chunk); err == nil {
 								merger.MergeObject(completion, chunk)
 							}
+							putCompletion(chunk)
 						}
 						var chunk MoonshotChunk
 						if err = json.Unmarshal(value, &chunk); err == nil && chunk.ID != "" {
