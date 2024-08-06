@@ -138,6 +138,29 @@ _注：启用 `--detect-repeat` 后，仅在流式输出（stream=True）的场�
 * `--repeat-threshold` 参数用于设置 MoonPalace 对重复内容的容忍度，越高的 threshold 表示容忍度越低，重复内容将更快被阻断，0 <= threshold <= 1
 * `--repeat-min-length` 参数用于设置 MoonPalace 检测重复内容输出的起始字符数量，例如：--repeat-min-length=100 表示当输出的 utf-8 字符数超过 100 时开启重复检测，输出字符数小于 100 时不开启重复内容输出检测
 
+#### 启用强制流式输出
+
+MoonPalace 提供了 `--force-stream` 的选项来强制让所有的 `/v1/chat/completions` 请求都使用流式输出模式：
+
+```shell
+$ moonpalace start --port <PORT> --force-stream
+```
+
+MoonPalace 会将请求参数中的 `stream` 字段设置为 `True`，并在获得响应时，自动根据调用方是否设置了 `stream` 来决定响应的格式：
+
+* 如果调用方已经设置 `stream=True`，则按照流式输出的格式返回，MoonPalace 不对响应做特殊处理；
+* 如果调用方没有设置 `stream` 的值，或设置了 `stream=False`，MoonPalace 会在接收完所有流式数据块后，将数据块拼接成完整的 completion 结构返回给调用方；
+
+对于调用方（开发者）而言，启用 `--force-stream` 选项不会你获得的 Kimi API 响应内容，你仍然可以使用原先的代码逻辑来调试和运行你的程序，换句话说：**开启 `--force-stream` 选项不会改变和破坏任何事物**，你可以放心地开启这个选项。
+
+为什么要提供这样的选项？
+
+> 我们初步推测常见的网络连接错误、超时等问题（Connection Error/Timeout）出现的原因是，在使用非流式模式进行请求的场合（stream=False），由于各中间层的网关或代理服务器对 read_header_timeout 或 read_timeout 进行了设置，导致当 Kimi API 服务端还在组装响应时，中间层的网关或代理服务器就断开了连接（由于没有收到响应，甚至是响应的 Header），产生 Connection Error/Timeout。
+> 
+> 我们尝试给 MoonPalace 添加了 `--force-stream` 参数，通过 `moonpalace start --force-stream` 启动时，MoonPalace 会将所有非流式请求（stream=False 或未设置 stream）转换为流式请求，并在接收完所有数据块后，组装成完整的 completion 响应结构返回给调用方。
+> 
+> 对于调用方而言，仍然可以使用原先的方式使用非流式 API，但经过 MoonPalace 的转换，能一定程度上减少 Connection Error/Timeout 的情况，因为此时 MoonPalace 已经与 Kimi API 服务端建立连接，并开始接收流式数据块。
+
 ### 检索请求
 
 在 MoonPalace 启动后，所有经过 MoonPalace 中转的请求都将被记录在一个 sqlite 数据库中，数据库所在的位置是 `$HOME/.moonpalace/moonpalace.sqlite`。你可以直接连接 MoonPalace 数据库以查询请求的具体内容，也可以通过 MoonPalace 命令行工具来查询请求：

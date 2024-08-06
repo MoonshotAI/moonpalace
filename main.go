@@ -17,7 +17,7 @@ func init() {
 var (
 	MoonPalace = &cobra.Command{
 		Use:           "moonpalace",
-		Version:       "v0.3.1",
+		Version:       "v0.4.0",
 		Short:         "MoonPalace is a command-line tool for debugging the Moonshot AI HTTP API",
 		SilenceErrors: true,
 		SilenceUsage:  true,
