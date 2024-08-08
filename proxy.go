@@ -85,7 +85,7 @@ var (
 	loggingMutex  sync.Mutex
 	detectorsPool = &sync.Pool{
 		New: func() any {
-			return make(map[int]*repeat.SuffixAutomaton)
+			return make(map[int]*RepeatDetector)
 		},
 	}
 	completionPool = &sync.Pool{
@@ -99,9 +99,9 @@ var (
 	}
 )
 
-func putDetectors(detectors map[int]*repeat.SuffixAutomaton) {
+func putDetectors(detectors map[int]*RepeatDetector) {
 	for index, detector := range detectors {
-		detector.Clear()
+		detector.Automaton.Clear()
 		delete(detectors, index)
 	}
 	detectorsPool.Put(detectors)
@@ -112,6 +112,16 @@ func putCompletion(completion map[string]any) {
 		delete(completion, objectKey)
 	}
 	completionPool.Put(completion)
+}
+
+func mergeIn(completion map[string]any, value []byte) {
+	chunk := completionPool.Get().(map[string]any)
+	defer putCompletion(chunk)
+	decoder := json.NewDecoder(bytes.NewReader(value))
+	decoder.UseNumber()
+	if err := decoder.Decode(&chunk); err == nil {
+		merger.MergeObject(completion, chunk)
+	}
 }
 
 func buildProxy(
@@ -260,8 +270,11 @@ func buildProxy(
 		}
 		w.WriteHeader(newResponse.StatusCode)
 		if contentType := filterHeaderFlags(newResponse.Header.Get("Content-Type")); contentType == "text/event-stream" {
-			detectors := detectorsPool.Get().(map[int]*repeat.SuffixAutomaton)
-			defer putDetectors(detectors)
+			var detectors map[int]*RepeatDetector
+			if detectRepeat {
+				detectors = detectorsPool.Get().(map[int]*RepeatDetector)
+				defer putDetectors(detectors)
+			}
 			var completion map[string]any
 			if forceStream && !requestUseStream {
 				completion = completionPool.Get().(map[string]any)
@@ -273,7 +286,7 @@ func buildProxy(
 				line := scanner.Bytes()
 				if !(forceStream && !requestUseStream) {
 					w.Write(line)
-					w.Write([]byte("\n"))
+					w.Write([]byte("\n\n"))
 				}
 				responseBody = append(responseBody, line...)
 				responseBody = append(responseBody, '\n')
@@ -281,13 +294,7 @@ func buildProxy(
 					field, value = bytes.TrimSpace(field), bytes.TrimSpace(value)
 					if bytes.Equal(field, []byte("data")) && !bytes.Equal(value, []byte("[DONE]")) {
 						if forceStream && !requestUseStream {
-							chunk := completionPool.Get().(map[string]any)
-							decoder := json.NewDecoder(bytes.NewReader(value))
-							decoder.UseNumber()
-							if err = decoder.Decode(&chunk); err == nil {
-								merger.MergeObject(completion, chunk)
-							}
-							putCompletion(chunk)
+							mergeIn(completion, value)
 						}
 						var chunk MoonshotChunk
 						if err = json.Unmarshal(value, &chunk); err == nil && chunk.ID != "" {
@@ -318,16 +325,39 @@ func buildProxy(
 										err = errors.New("it seems that your max_tokens value is too small, please set a larger value")
 									}
 									if detectRepeat {
-										var detector *repeat.SuffixAutomaton
+										var detector *RepeatDetector
 										if _, exists := detectors[choice.Index]; exists {
 											detector = detectors[choice.Index]
 										} else {
-											detector = repeat.NewSuffixAutomaton()
+											detector = &RepeatDetector{Automaton: repeat.NewSuffixAutomaton()}
 											detectors[choice.Index] = detector
 										}
-										detector.AddString(choice.Delta.Content)
-										if detector.Length() > repeatMinLength && detector.GetRepeatness() < repeatThreshold {
+										if choice.FinishReason != nil {
+											detector.FinishReason = *choice.FinishReason
+										}
+										detector.Automaton.AddString(choice.Delta.Content)
+										if detector.Automaton.Length() > repeatMinLength && detector.Automaton.GetRepeatness() < repeatThreshold {
 											err = errors.New("it appears that there is an issue with content repeating in the current response")
+											for index, snapshot := range detectors {
+												if snapshot.FinishReason == "" {
+													finishChunk := []byte(fmt.Sprintf(
+														"{\"choices\":[{\"delta\":{},\"finish_reason\":\"repeat\",\"index\":%d}],"+
+															"\"created\":%d,\"id\":\"%s\",\"model\":\"%s\",\"object\":\"%s\"}",
+														index,
+														chunk.Created,
+														chunk.ID,
+														chunk.Model,
+														chunk.Object,
+													))
+													if forceStream && !requestUseStream {
+														mergeIn(completion, finishChunk)
+													} else {
+														w.Write([]byte("data: "))
+														w.Write(finishChunk)
+														w.Write([]byte("\n\n"))
+													}
+												}
+											}
 											if !(forceStream && !requestUseStream) {
 												w.Write([]byte("[DONE]"))
 											}
@@ -436,6 +466,9 @@ type MoonshotChunk = MoonshotCompletion
 
 type MoonshotCompletion struct {
 	ID      string            `json:"id"`
+	Created int64             `json:"created"`
+	Model   string            `json:"model"`
+	Object  string            `json:"object"`
 	Choices []*MoonshotChoice `json:"choices"`
 	Usage   *MoonshotUsage    `json:"usage"`
 }
@@ -552,4 +585,9 @@ func forceUseStream(data []byte) []byte {
 	newData = append(newData, streamOptions...)
 	newData = append(newData, data[insertIndex:]...)
 	return newData
+}
+
+type RepeatDetector struct {
+	Automaton    *repeat.SuffixAutomaton
+	FinishReason string
 }
