@@ -67,20 +67,20 @@ func logRequest(
 		if moonshotUID != "" {
 			logger.Printf("    - Msh-Uid:               %s\n", moonshotUID)
 			logger.Printf("    - Msh-Gid:               %s\n", moonshotGID)
-			if moonshot != nil && moonshot.ID != "" {
-				logger.Printf("  - Response: \n")
-				logger.Printf("    - id:                %s\n", moonshot.ID)
-				if responseTTFT > 0 {
-					logger.Printf("    - ttft:              %d\n", responseTTFT)
-				}
-				if usage := moonshot.Usage; usage != nil {
-					logger.Printf("    - prompt_tokens:     %d\n", usage.PromptTokens)
-					logger.Printf("    - completion_tokens: %d\n", usage.CompletionTokens)
-					logger.Printf("    - total_tokens:      %d\n", usage.TotalTokens)
-					if usage.CachedTokens > 0 {
-						logger.Printf("    - cached_tokens:     %d\n", usage.CachedTokens)
-					}
-				}
+		}
+	}
+	if moonshot != nil && moonshot.ID != "" {
+		logger.Printf("  - Response: \n")
+		logger.Printf("    - id:                %s\n", moonshot.ID)
+		if responseTTFT > 0 {
+			logger.Printf("    - ttft:              %d\n", responseTTFT)
+		}
+		if usage := moonshot.Usage; usage != nil {
+			logger.Printf("    - prompt_tokens:     %d\n", usage.PromptTokens)
+			logger.Printf("    - completion_tokens: %d\n", usage.CompletionTokens)
+			logger.Printf("    - total_tokens:      %d\n", usage.TotalTokens)
+			if usage.CachedTokens > 0 {
+				logger.Printf("    - cached_tokens:     %d\n", usage.CachedTokens)
 			}
 		}
 	}

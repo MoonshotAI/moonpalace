@@ -1,5 +1,5 @@
-//go:build !endpoint_sg
-// +build !endpoint_sg
+//go:build !endpoint_sg && !endpoint_custom
+// +build !endpoint_sg,!endpoint_custom
 
 package main
 
