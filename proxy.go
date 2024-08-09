@@ -305,7 +305,7 @@ func buildProxy(
 							moonshotID = moonshot.ID
 							if chunk.Choices != nil && len(chunk.Choices) > 0 {
 								for _, choice := range chunk.Choices {
-									if choice.Delta.Content != "" && responseTTFT == 0 {
+									if responseTTFT == 0 && hasStreamToken(choice.Delta) {
 										responseTTFT = int(time.Since(createdAt) / time.Millisecond)
 									}
 									if choice.Usage != nil {
@@ -482,7 +482,24 @@ type MoonshotChoice struct {
 }
 
 type MoonshotMessage struct {
-	Content string `json:"content"`
+	Content   string `json:"content"`
+	ToolCalls []*struct {
+		Function *struct {
+			Arguments string `json:"arguments"`
+		} `json:"function"`
+	} `json:"tool_calls"`
+}
+
+func hasStreamToken(message *MoonshotMessage) bool {
+	if message.Content != "" {
+		return true
+	}
+	for _, toolCall := range message.ToolCalls {
+		if toolCall != nil && toolCall.Function != nil && toolCall.Function.Arguments != "" {
+			return true
+		}
+	}
+	return false
 }
 
 type MoonshotUsage struct {
