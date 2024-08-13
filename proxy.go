@@ -20,6 +20,7 @@ import (
 	"github.com/MoonshotAI/moonpalace/detector/repeat"
 	"github.com/MoonshotAI/moonpalace/merge"
 	"github.com/spf13/cobra"
+	"github.com/tidwall/sjson"
 )
 
 func startCommand() *cobra.Command {
@@ -221,9 +222,11 @@ func buildProxy(
 		if forceStream {
 			var streamRequest MoonshotStreamRequest
 			json.Unmarshal(requestBody, &streamRequest)
-			requestUseStream = streamRequest.Stream
+			if streamRequest.Stream != nil {
+				requestUseStream = *streamRequest.Stream
+			}
 			if !requestUseStream {
-				requestBody = forceUseStream(requestBody)
+				requestBody = forceUseStream(requestBody, streamRequest.Stream != nil)
 			}
 		}
 		newRequest, err = http.NewRequestWithContext(
@@ -471,7 +474,7 @@ type Moonshot struct {
 }
 
 type MoonshotStreamRequest struct {
-	Stream bool `json:"stream"`
+	Stream *bool `json:"stream"`
 }
 
 type MoonshotChunk = MoonshotCompletion
@@ -595,25 +598,32 @@ var asciiSpace = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
 
 const streamOptions = `"stream":true,"stream_options":{"include_usage":true},`
 
-func forceUseStream(data []byte) []byte {
+func forceUseStream(data []byte, hasStreamKey bool) []byte {
 	if !json.Valid(data) {
 		return data
 	}
-	newData := make([]byte, 0, len(data)+len(streamOptions))
-	insertIndex := 0
-	for i, b := range data {
-		if asciiSpace[b] == 1 {
-			continue
+	if !hasStreamKey {
+		newData := make([]byte, 0, len(data)+len(streamOptions))
+		insertIndex := 0
+		for i, b := range data {
+			if asciiSpace[b] == 1 {
+				continue
+			}
+			if b == '{' {
+				insertIndex = i + 1
+				break
+			}
 		}
-		if b == '{' {
-			insertIndex = i + 1
-			break
-		}
+		newData = append(newData, '{')
+		newData = append(newData, streamOptions...)
+		newData = append(newData, data[insertIndex:]...)
+		return newData
 	}
-	newData = append(newData, '{')
-	newData = append(newData, streamOptions...)
-	newData = append(newData, data[insertIndex:]...)
-	return newData
+	data, _ = sjson.SetBytesOptions(data, "stream", true, &sjson.Options{
+		Optimistic:     true,
+		ReplaceInPlace: true,
+	})
+	return data
 }
 
 type RepeatDetector struct {
