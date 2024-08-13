@@ -24,22 +24,34 @@ func init() {
 	if err := persistence.createTable(); err != nil {
 		logFatal(err)
 	}
-	if err := addTTFTField(); err != nil {
+	tableInfos, err := persistence.inspectTable()
+	if err != nil {
+		logFatal(err)
+	}
+	if err = addTTFTField(tableInfos); err != nil {
+		logFatal(err)
+	}
+	if err = addLatencyField(tableInfos); err != nil {
 		logFatal(err)
 	}
 }
 
-func addTTFTField() error {
-	tableInfos, err := persistence.inspectTable()
-	if err != nil {
-		return err
-	}
+func addTTFTField(tableInfos []*tableInfo) error {
 	for _, info := range tableInfos {
 		if info.Name == "response_ttft" {
 			return nil
 		}
 	}
 	return persistence.addTTFTField()
+}
+
+func addLatencyField(tableInfos []*tableInfo) error {
+	for _, info := range tableInfos {
+		if info.Name == "latency" {
+			return nil
+		}
+	}
+	return persistence.addLatencyField()
 }
 
 type tableInfo struct {
@@ -90,6 +102,10 @@ type Persistence interface {
 	// alter table moonshot_requests add response_ttft integer;
 	addTTFTField() error
 
+	// addLatencyField exec
+	// alter table moonshot_requests add latency integer;
+	addLatencyField() error
+
 	// Cleanup exec named const
 	// delete from moonshot_requests where created_at < :before;
 	Cleanup(before string) (sql.Result, error)
@@ -116,6 +132,7 @@ type Persistence interface {
 		    {{ if .responseBody }},response_body{{ end }}
 		    {{ if .programError }},error{{ end }}
 		    {{ if .responseTTFT }},response_ttft{{ end }}
+		    {{ if .latency }},latency{{ end }}
 		) values (
 			:requestMethod,
 		    :requestPath,
@@ -136,6 +153,7 @@ type Persistence interface {
 		    {{ if .responseBody }},:responseBody{{ end }}
 		    {{ if .programError }},:programError{{ end }}
 		    {{ if .responseTTFT }},:responseTTFT{{ end }}
+		    {{ if .latency }},:latency{{ end }}
 		);
 	*/
 	// select last_insert_rowid();
@@ -159,6 +177,7 @@ type Persistence interface {
 		programError string,
 		responseTTFT int,
 		createdAt string,
+		latency time.Duration,
 	) (pid int64, err error)
 
 	// ListRequests query many named
@@ -218,6 +237,7 @@ type Request struct {
 	ResponseTTFT         sql.NullInt64  `db:"response_ttft"`
 	Error                sql.NullString `db:"error"`
 	CreatedAt            SqliteTime     `db:"created_at"`
+	Latency              sql.NullInt64  `db:"latency"`
 
 	// Extra Fields
 
@@ -333,6 +353,9 @@ func (r *Request) Metadata() (metadata map[string]string) {
 		metadata["response_ttft"] = strconv.FormatInt(r.ResponseTTFT.Int64, 10)
 	}
 	metadata["requested_at"] = r.CreatedAt.Format(time.DateTime)
+	if r.Latency.Valid {
+		metadata["latency"] = strconv.FormatInt(r.Latency.Int64/int64(time.Millisecond), 10)
+	}
 	return metadata
 }
 

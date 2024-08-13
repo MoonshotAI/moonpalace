@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -69,10 +70,11 @@ var (
 
 	__PersistenceBaseTemplate = template.Must(template.New("PersistenceBaseTemplate").Funcs(template.FuncMap{"bindvars": __PersistenceBindVars}).Parse(""))
 
-	sqlTmpladdTTFTField = template.Must(__PersistenceBaseTemplate.New("addTTFTField").Parse("alter table moonshot_requests add response_ttft integer;\r\n"))
-	sqlTmplPersistence  = template.Must(__PersistenceBaseTemplate.New("Persistence").Parse("insert into moonshot_requests ( request_method, request_path, request_query, created_at {{ if .requestContentType }},request_content_type{{ end }} {{ if .requestID }},request_id{{ end }} {{ if .moonshotID }},moonshot_id{{ end }} {{ if .moonshotGID }},moonshot_gid{{ end }} {{ if .moonshotUID }},moonshot_uid{{ end }} {{ if .moonshotRequestID }},moonshot_request_id{{ end }} {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }} {{ if .responseStatusCode }},response_status_code{{ end }} {{ if .responseContentType }},response_content_type{{ end }} {{ if .requestHeader }},request_header{{ end }} {{ if .requestBody }},request_body{{ end }} {{ if .responseHeader }},response_header{{ end }} {{ if .responseBody }},response_body{{ end }} {{ if .programError }},error{{ end }} {{ if .responseTTFT }},response_ttft{{ end }} ) values ( :requestMethod, :requestPath, :requestQuery, :createdAt {{ if .requestContentType }},:requestContentType{{ end }} {{ if .requestID }},:requestID{{ end }} {{ if .moonshotID }},:moonshotID{{ end }} {{ if .moonshotGID }},:moonshotGID{{ end }} {{ if .moonshotUID }},:moonshotUID{{ end }} {{ if .moonshotRequestID }},:moonshotRequestID{{ end }} {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }} {{ if .responseStatusCode }},:responseStatusCode{{ end }} {{ if .responseContentType }},:responseContentType{{ end }} {{ if .requestHeader }},:requestHeader{{ end }} {{ if .requestBody }},:requestBody{{ end }} {{ if .responseHeader }},:responseHeader{{ end }} {{ if .responseBody }},:responseBody{{ end }} {{ if .programError }},:programError{{ end }} {{ if .responseTTFT }},:responseTTFT{{ end }} );\r\nselect last_insert_rowid();\r\n"))
-	sqlTmplListRequests = template.Must(__PersistenceBaseTemplate.New("ListRequests").Parse("select * from moonshot_requests where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} order by id desc limit :n;\r\n"))
-	sqlTmplGetRequest   = template.Must(__PersistenceBaseTemplate.New("GetRequest").Parse("select * from moonshot_requests where 1 = 1 {{ if .id }} and id = :id {{ end }} {{ if .chatcmpl }} and moonshot_id = :chatcmpl {{ end }} {{ if .requestid }} and moonshot_request_id = :requestid {{ end }} ;\r\n"))
+	sqlTmpladdTTFTField    = template.Must(__PersistenceBaseTemplate.New("addTTFTField").Parse("alter table moonshot_requests add response_ttft integer;\r\n"))
+	sqlTmpladdLatencyField = template.Must(__PersistenceBaseTemplate.New("addLatencyField").Parse("alter table moonshot_requests add latency integer;\r\n"))
+	sqlTmplPersistence     = template.Must(__PersistenceBaseTemplate.New("Persistence").Parse("insert into moonshot_requests ( request_method, request_path, request_query, created_at {{ if .requestContentType }},request_content_type{{ end }} {{ if .requestID }},request_id{{ end }} {{ if .moonshotID }},moonshot_id{{ end }} {{ if .moonshotGID }},moonshot_gid{{ end }} {{ if .moonshotUID }},moonshot_uid{{ end }} {{ if .moonshotRequestID }},moonshot_request_id{{ end }} {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }} {{ if .responseStatusCode }},response_status_code{{ end }} {{ if .responseContentType }},response_content_type{{ end }} {{ if .requestHeader }},request_header{{ end }} {{ if .requestBody }},request_body{{ end }} {{ if .responseHeader }},response_header{{ end }} {{ if .responseBody }},response_body{{ end }} {{ if .programError }},error{{ end }} {{ if .responseTTFT }},response_ttft{{ end }} {{ if .latency }},latency{{ end }} ) values ( :requestMethod, :requestPath, :requestQuery, :createdAt {{ if .requestContentType }},:requestContentType{{ end }} {{ if .requestID }},:requestID{{ end }} {{ if .moonshotID }},:moonshotID{{ end }} {{ if .moonshotGID }},:moonshotGID{{ end }} {{ if .moonshotUID }},:moonshotUID{{ end }} {{ if .moonshotRequestID }},:moonshotRequestID{{ end }} {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }} {{ if .responseStatusCode }},:responseStatusCode{{ end }} {{ if .responseContentType }},:responseContentType{{ end }} {{ if .requestHeader }},:requestHeader{{ end }} {{ if .requestBody }},:requestBody{{ end }} {{ if .responseHeader }},:responseHeader{{ end }} {{ if .responseBody }},:responseBody{{ end }} {{ if .programError }},:programError{{ end }} {{ if .responseTTFT }},:responseTTFT{{ end }} {{ if .latency }},:latency{{ end }} );\r\nselect last_insert_rowid();\r\n"))
+	sqlTmplListRequests    = template.Must(__PersistenceBaseTemplate.New("ListRequests").Parse("select * from moonshot_requests where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} order by id desc limit :n;\r\n"))
+	sqlTmplGetRequest      = template.Must(__PersistenceBaseTemplate.New("GetRequest").Parse("select * from moonshot_requests where 1 = 1 {{ if .id }} and id = :id {{ end }} {{ if .chatcmpl }} and moonshot_id = :chatcmpl {{ end }} {{ if .requestid }} and moonshot_request_id = :requestid {{ end }} ;\r\n"))
 )
 
 func (__imp *implPersistence) createTable() error {
@@ -223,6 +225,59 @@ func (__imp *implPersistence) addTTFTField() error {
 	return nil
 }
 
+func (__imp *implPersistence) addLatencyField() error {
+	var (
+		erraddLatencyField     error
+		argListaddLatencyField = make(__PersistenceArguments, 0, 8)
+	)
+
+	argListaddLatencyField = __PersistenceArguments{}
+
+	sqladdLatencyField := __PersistenceGetBuffer()
+	defer __PersistencePutBuffer(sqladdLatencyField)
+	defer sqladdLatencyField.Reset()
+
+	if erraddLatencyField = sqlTmpladdLatencyField.Execute(sqladdLatencyField, map[string]any{}); erraddLatencyField != nil {
+		return fmt.Errorf("error executing %s template: %w", strconv.Quote("addLatencyField"), erraddLatencyField)
+	}
+
+	queryaddLatencyField := sqladdLatencyField.String()
+
+	txaddLatencyField, erraddLatencyField := __imp.__core.Beginx()
+	if erraddLatencyField != nil {
+		return fmt.Errorf("error creating %s transaction: %w", strconv.Quote("addLatencyField"), erraddLatencyField)
+	}
+	if !__imp.__withTx {
+		defer txaddLatencyField.Rollback()
+	}
+
+	offsetaddLatencyField := 0
+	argsaddLatencyField := __PersistenceMergeArgs(argListaddLatencyField...)
+
+	sqlSliceaddLatencyField := __PersistenceSplit(queryaddLatencyField, ";")
+	for indexaddLatencyField, splitSqladdLatencyField := range sqlSliceaddLatencyField {
+		_ = indexaddLatencyField
+
+		countaddLatencyField := __PersistenceCount(splitSqladdLatencyField, "?")
+
+		_, erraddLatencyField = txaddLatencyField.Exec(splitSqladdLatencyField, argsaddLatencyField[offsetaddLatencyField:offsetaddLatencyField+countaddLatencyField]...)
+
+		if erraddLatencyField != nil {
+			return fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("addLatencyField"), splitSqladdLatencyField, erraddLatencyField)
+		}
+
+		offsetaddLatencyField += countaddLatencyField
+	}
+
+	if !__imp.__withTx {
+		if erraddLatencyField := txaddLatencyField.Commit(); erraddLatencyField != nil {
+			return fmt.Errorf("error committing %s transaction: %w", strconv.Quote("addLatencyField"), erraddLatencyField)
+		}
+	}
+
+	return nil
+}
+
 func (__imp *implPersistence) Cleanup(before string) (sql.Result, error) {
 	var (
 		v0Cleanup  sql.Result
@@ -275,7 +330,7 @@ func (__imp *implPersistence) Cleanup(before string) (sql.Result, error) {
 	return v0Cleanup, nil
 }
 
-func (__imp *implPersistence) Persistence(requestID string, requestContentType string, requestMethod string, requestPath string, requestQuery string, moonshotID string, moonshotGID string, moonshotUID string, moonshotRequestID string, moonshotServerTiming int, responseStatusCode int, responseContentType string, requestHeader string, requestBody string, responseHeader string, responseBody string, programError string, responseTTFT int, createdAt string) (int64, error) {
+func (__imp *implPersistence) Persistence(requestID string, requestContentType string, requestMethod string, requestPath string, requestQuery string, moonshotID string, moonshotGID string, moonshotUID string, moonshotRequestID string, moonshotServerTiming int, responseStatusCode int, responseContentType string, requestHeader string, requestBody string, responseHeader string, responseBody string, programError string, responseTTFT int, createdAt string, latency time.Duration) (int64, error) {
 	var (
 		v0Persistence  int64
 		errPersistence error
@@ -305,6 +360,7 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 		"programError":         programError,
 		"responseTTFT":         responseTTFT,
 		"createdAt":            createdAt,
+		"latency":              latency,
 	}); errPersistence != nil {
 		return v0Persistence, fmt.Errorf("error executing %s template: %w", strconv.Quote("Persistence"), errPersistence)
 	}
@@ -339,6 +395,7 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 		"programError":         programError,
 		"responseTTFT":         responseTTFT,
 		"createdAt":            createdAt,
+		"latency":              latency,
 	})
 
 	sqlSlicePersistence := __PersistenceSplit(queryPersistence, ";")

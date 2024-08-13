@@ -158,6 +158,8 @@ func buildProxy(
 			responseContentType       string
 			responseTTFT              int
 			createdAt                 = time.Now()
+			latency                   time.Duration
+			tokenFinishLatency        time.Duration
 		)
 		defer func() {
 			go func() {
@@ -178,6 +180,8 @@ func buildProxy(
 					moonshotUID,
 					moonshotGID,
 					moonshot,
+					latency,
+					tokenFinishLatency,
 					err,
 				)
 				var lastInsertID int64
@@ -201,6 +205,7 @@ func buildProxy(
 					toErrMsg(err),
 					responseTTFT,
 					createdAt.Format(time.DateTime),
+					latency,
 				)
 				if err != nil {
 					logFatal(err)
@@ -370,6 +375,7 @@ func buildProxy(
 					}
 				}
 			}
+			tokenFinishLatency = time.Since(createdAt)
 			if forceStream && !requestUseStream {
 				w.Header().Set("Content-Type", "application/json; charset=utf-8")
 				w.Header().Del("Content-Encoding")
@@ -393,6 +399,7 @@ func buildProxy(
 				writeProxyError(encoder, "read_response_body", err)
 				return
 			}
+			tokenFinishLatency = time.Since(createdAt)
 			w.Write(responseBody)
 			if isGzip(newResponse.Header) {
 				var gzipReader *gzip.Reader
@@ -429,6 +436,11 @@ func buildProxy(
 					}
 				}
 			}
+		}
+		if tokenFinishLatency > 0 {
+			latency = tokenFinishLatency
+		} else {
+			latency = time.Since(createdAt)
 		}
 		moonshotGID = newResponse.Header.Get("Msh-Gid")
 		moonshotUID = newResponse.Header.Get("Msh-Uid")

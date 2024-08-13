@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 )
@@ -43,6 +44,8 @@ func logRequest(
 	moonshotUID string,
 	moonshotGID string,
 	moonshot *Moonshot,
+	latency time.Duration,
+	tokenFinishLatency time.Duration,
 	err error,
 ) {
 	if query != "" {
@@ -60,7 +63,7 @@ func logRequest(
 		logger.Printf("  - Response Headers: \n")
 		logger.Printf("    - Content-Type:          %s\n", responseContentType)
 		logger.Printf("    - Msh-Request-Id:        %s\n", moonshotRequestID)
-		logger.Printf("    - Server-Timing:         %d\n", moonshotServerTiming)
+		logger.Printf("    - Server-Timing:         %.4fs\n", float64(moonshotServerTiming)/1000.00)
 		if moonshotContextCacheID != "" {
 			logger.Printf("    - Msh-Context-Cache-Id:  %s\n", moonshotContextCacheID)
 		}
@@ -73,9 +76,16 @@ func logRequest(
 		logger.Printf("  - Response: \n")
 		logger.Printf("    - id:                %s\n", moonshot.ID)
 		if responseTTFT > 0 {
-			logger.Printf("    - ttft:              %d\n", responseTTFT)
+			logger.Printf("    - ttft:              %.4fs\n", float64(responseTTFT)/1000.00)
 		}
 		if usage := moonshot.Usage; usage != nil {
+			if tokenFinishLatency > 0 {
+				logger.Printf("    - tpot:              %.4fs/token\n",
+					((float64(tokenFinishLatency)-
+						float64(responseTTFT)*float64(time.Millisecond))/
+						float64(time.Second))/
+						float64(usage.CompletionTokens-1))
+			}
 			logger.Printf("    - prompt_tokens:     %d\n", usage.PromptTokens)
 			logger.Printf("    - completion_tokens: %d\n", usage.CompletionTokens)
 			logger.Printf("    - total_tokens:      %d\n", usage.TotalTokens)
@@ -83,6 +93,9 @@ func logRequest(
 				logger.Printf("    - cached_tokens:     %d\n", usage.CachedTokens)
 			}
 		}
+	}
+	if latency > 0 {
+		logger.Printf("    - latency:           %.4fs\n", float64(latency)/float64(time.Second))
 	}
 	if err != nil {
 		if errorMsg := err.Error(); errorMsg != "" {
