@@ -294,7 +294,7 @@ func buildProxy(
 				line := scanner.Bytes()
 				if !(forceStream && !requestUseStream) {
 					w.Write(line)
-					w.Write([]byte("\n\n"))
+					w.Write([]byte("\n"))
 				}
 				responseBody = append(responseBody, line...)
 				responseBody = append(responseBody, '\n')
@@ -362,7 +362,7 @@ func buildProxy(
 													} else {
 														w.Write([]byte("data: "))
 														w.Write(finishChunk)
-														w.Write([]byte("\n\n"))
+														w.Write([]byte("\n"))
 													}
 												}
 											}
