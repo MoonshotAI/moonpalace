@@ -23,6 +23,7 @@ var (
 	boldYellow = color.New(color.FgYellow, color.Bold).SprintfFunc()
 	boldRed    = color.New(color.FgRed, color.Bold).SprintfFunc()
 	green      = color.New(color.FgHiGreen).SprintfFunc()
+	red        = color.New(color.FgRed).SprintfFunc()
 )
 
 func logServerStarts(baseUrl string) {
@@ -51,7 +52,17 @@ func logRequest(
 	if query != "" {
 		path += "?" + query
 	}
-	logger.Printf("%s %s %s\n", boldYellow(fmt.Sprintf("%-6s", method)), boldWhite(path), green(responseStatus))
+	if strings.HasPrefix(responseStatus, "2") {
+		responseStatus = green(responseStatus)
+	} else {
+		responseStatus = red(responseStatus)
+	}
+	logger.Printf("%s %s %s %.2fs\n",
+		boldYellow(fmt.Sprintf("%-6s", method)),
+		boldWhite(path),
+		responseStatus,
+		float64(latency)/float64(time.Second),
+	)
 	if requestContentType != "" {
 		logger.Printf("  - Request Headers: \n")
 		logger.Printf("    - Content-Type:   %s\n", requestContentType)
@@ -93,9 +104,6 @@ func logRequest(
 				logger.Printf("    - cached_tokens:     %d\n", usage.CachedTokens)
 			}
 		}
-	}
-	if latency > 0 {
-		logger.Printf("    - latency:           %.4fs\n", float64(latency)/float64(time.Second))
 	}
 	if err != nil {
 		if errorMsg := err.Error(); errorMsg != "" {

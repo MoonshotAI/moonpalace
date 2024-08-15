@@ -166,6 +166,9 @@ func buildProxy(
 			go func() {
 				loggingMutex.Lock()
 				defer loggingMutex.Unlock()
+				if latency == 0 {
+					latency = time.Since(createdAt)
+				}
 				logRequest(
 					requestMethod,
 					requestPath,
