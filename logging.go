@@ -26,8 +26,19 @@ var (
 	red        = color.New(color.FgRed).SprintfFunc()
 )
 
+const asciiMoonPalace = `
+ _____ ______    ________   ________   ________    ________   ________   ___        ________   ________   _______      
+|\   _ \  _   \ |\   __  \ |\   __  \ |\   ___  \ |\   __  \ |\   __  \ |\  \      |\   __  \ |\   ____\ |\  ___ \     
+\ \  \\\__\ \  \\ \  \|\  \\ \  \|\  \\ \  \\ \  \\ \  \|\  \\ \  \|\  \\ \  \     \ \  \|\  \\ \  \___| \ \   __/|    
+ \ \  \\|__| \  \\ \  \\\  \\ \  \\\  \\ \  \\ \  \\ \   ____\\ \   __  \\ \  \     \ \   __  \\ \  \     \ \  \_|/__  
+  \ \  \    \ \  \\ \  \\\  \\ \  \\\  \\ \  \\ \  \\ \  \___| \ \  \ \  \\ \  \____ \ \  \ \  \\ \  \____ \ \  \_|\ \ 
+   \ \__\    \ \__\\ \_______\\ \_______\\ \__\\ \__\\ \__\     \ \__\ \__\\ \_______\\ \__\ \__\\ \_______\\ \_______\
+    \|__|     \|__| \|_______| \|_______| \|__| \|__| \|__|      \|__|\|__| \|_______| \|__|\|__| \|_______| \|_______|
+                                                                                                                       
+`
+
 func logServerStarts(baseUrl string) {
-	logger.Println(boldWhite("MoonPalace Starts => change base_url to " + strconv.Quote(baseUrl)))
+	logger.Println(boldWhite("MoonPalace Starts => change base_url to "+strconv.Quote(baseUrl)) + "\n" + asciiMoonPalace)
 }
 
 func logRequest(
