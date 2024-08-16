@@ -3,8 +3,16 @@
 
 package main
 
+import "github.com/spf13/cobra"
+
 var endpoint string
 
 func init() {
-	MoonPalace.PersistentFlags().StringVar(&endpoint, "endpoint", "https://api.moonshot.cn", "API endpoint")
+	flags := MoonPalace.PersistentFlags()
+	flags.StringVar(&endpoint, "endpoint", "https://api.moonshot.cn", "API endpoint")
+	cobra.OnInitialize(func() {
+		if !flags.Changed("endpoint") && MoonConfig.Endpoint != "" {
+			endpoint = MoonConfig.Endpoint
+		}
+	})
 }

@@ -61,3 +61,18 @@ func getPalaceServerErrorLog() io.Writer {
 	}
 	return file
 }
+
+func getConfig() io.Reader {
+	palaceDir := getPalaceDir()
+	configPath := filepath.Join(palaceDir, "config.yaml")
+open:
+	file, err := os.Open(configPath)
+	if err != nil {
+		if filepath.Ext(configPath) == ".yaml" && os.IsNotExist(err) {
+			configPath = filepath.Join(palaceDir, "config.yml")
+			goto open
+		}
+		return nil
+	}
+	return file
+}

@@ -23,14 +23,41 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+type StartConfig struct {
+	Port         int16               `yaml:"port"`
+	Key          string              `yaml:"key"`
+	DetectRepeat *DetectRepeatConfig `yaml:"detect-repeat"`
+	ForceStream  bool                `yaml:"force-stream"`
+}
+
+type DetectRepeatConfig struct {
+	Threshold float64 `yaml:"threshold"`
+	MinLength int32   `yaml:"min-length"`
+}
+
 func startCommand() *cobra.Command {
+	var cfg *StartConfig
+	if MoonConfig.Start != nil {
+		cfg = MoonConfig.Start
+	} else {
+		cfg = &StartConfig{}
+	}
+	if cfg.Port == 0 {
+		cfg.Port = 9988
+	}
+	if cfg.DetectRepeat == nil {
+		cfg.DetectRepeat = &DetectRepeatConfig{
+			Threshold: 0.5,
+			MinLength: 100,
+		}
+	}
 	var (
-		port            int16
-		key             string
-		detectRepeat    bool
-		repeatThreshold float64
-		repeatMinLength int32
-		forceStream     bool
+		port            = cfg.Port
+		key             = cfg.Key
+		detectRepeat    = cfg.DetectRepeat != nil
+		repeatThreshold = cfg.DetectRepeat.Threshold
+		repeatMinLength = cfg.DetectRepeat.MinLength
+		forceStream     = cfg.ForceStream
 	)
 	cmd := &cobra.Command{
 		Use:   "start",
@@ -64,12 +91,12 @@ func startCommand() *cobra.Command {
 		},
 	}
 	flags := cmd.PersistentFlags()
-	flags.Int16VarP(&port, "port", "p", 9988, "port to listen on")
-	flags.StringVarP(&key, "key", "k", "", "API key by default")
-	flags.BoolVar(&detectRepeat, "detect-repeat", false, "detect and prevent repeating tokens in streaming output")
-	flags.Float64Var(&repeatThreshold, "repeat-threshold", 0.5, "repeat threshold, a float between [0, 1]")
-	flags.Int32Var(&repeatMinLength, "repeat-min-length", 100, "repeat min length, minimum string length to detect repeat")
-	flags.BoolVar(&forceStream, "force-stream", false, "force streaming for all chat completions requests")
+	flags.Int16VarP(&port, "port", "p", port, "port to listen on")
+	flags.StringVarP(&key, "key", "k", key, "API key by default")
+	flags.BoolVar(&detectRepeat, "detect-repeat", detectRepeat, "detect and prevent repeating tokens in streaming output")
+	flags.Float64Var(&repeatThreshold, "repeat-threshold", repeatThreshold, "repeat threshold, a float between [0, 1]")
+	flags.Int32Var(&repeatMinLength, "repeat-min-length", repeatMinLength, "repeat min length, minimum string length to detect repeat")
+	flags.BoolVar(&forceStream, "force-stream", forceStream, "force streaming for all chat completions requests")
 	return cmd
 }
 
