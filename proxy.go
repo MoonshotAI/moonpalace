@@ -318,16 +318,40 @@ func buildProxy(
 				completion = completionPool.Get().(map[string]any)
 				defer putCompletion(completion)
 			}
-			scanner := bufio.NewScanner(newResponse.Body)
+			var (
+				scanner        *bufio.Scanner
+				responseWriter io.Writer
+			)
+			if isGzip(newResponse.Header) {
+				var gzipReader *gzip.Reader
+				gzipReader, err = gzip.NewReader(newResponse.Body)
+				if err != nil {
+					return
+				}
+				defer gzipReader.Close()
+				scanner = bufio.NewScanner(gzipReader)
+				gzipWriter, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+				defer gzipWriter.Close()
+				responseWriter = gzipWriter
+			} else {
+				scanner = bufio.NewScanner(newResponse.Body)
+				responseWriter = w
+			}
 		READLINES:
 			for scanner.Scan() {
 				line := scanner.Bytes()
 				if !(forceStream && !requestUseStream) {
-					w.Write(line)
-					w.Write([]byte("\n"))
+					responseWriter.Write(line)
+					responseWriter.Write([]byte("\n\n"))
+					if flusher, ok := responseWriter.(*gzip.Writer); ok {
+						flusher.Flush()
+					}
+				}
+				if len(bytes.TrimSpace(line)) == 0 {
+					continue READLINES
 				}
 				responseBody = append(responseBody, line...)
-				responseBody = append(responseBody, '\n')
+				responseBody = append(responseBody, "\n\n"...)
 				if field, value, ok := bytes.Cut(line, []byte{':'}); ok {
 					field, value = bytes.TrimSpace(field), bytes.TrimSpace(value)
 					if bytes.Equal(field, []byte("data")) && !bytes.Equal(value, []byte("[DONE]")) {
@@ -390,14 +414,14 @@ func buildProxy(
 													if forceStream && !requestUseStream {
 														mergeIn(completion, finishChunk)
 													} else {
-														w.Write([]byte("data: "))
-														w.Write(finishChunk)
-														w.Write([]byte("\n"))
+														responseWriter.Write([]byte("data: "))
+														responseWriter.Write(finishChunk)
+														responseWriter.Write([]byte("\n\n"))
 													}
 												}
 											}
 											if !(forceStream && !requestUseStream) {
-												w.Write([]byte("[DONE]"))
+												responseWriter.Write([]byte("[DONE]"))
 											}
 											break READLINES
 										}
@@ -440,6 +464,7 @@ func buildProxy(
 				if err != nil {
 					return
 				}
+				defer gzipReader.Close()
 				responseBody, err = io.ReadAll(gzipReader)
 				if err != nil {
 					return
