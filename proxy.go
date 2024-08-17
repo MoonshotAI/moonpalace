@@ -448,7 +448,7 @@ func buildProxy(
 						}
 					}
 				}
-				json.NewEncoder(w).Encode(completion)
+				json.NewEncoder(responseWriter).Encode(completion)
 			}
 		} else {
 			responseBody, err = io.ReadAll(newResponse.Body)
