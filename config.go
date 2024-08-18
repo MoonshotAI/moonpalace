@@ -2,7 +2,7 @@ package main
 
 import "gopkg.in/yaml.v3"
 
-var MoonConfig *Config
+var MoonConfig Config
 
 type Config struct {
 	Endpoint string       `yaml:"endpoint"`
