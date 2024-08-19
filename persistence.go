@@ -223,7 +223,7 @@ type Persistence interface {
 			select
 				{{ fields "response_body" }},
 				iif(
-					response_content_type = 'text/event-stream',
+					response_content_type = 'text/event-stream' and response_body is not null,
 					merge_cmpl(response_body),
 					response_body
 				) as response_body
