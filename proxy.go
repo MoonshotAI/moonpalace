@@ -306,7 +306,9 @@ func buildProxy(
 				w.Header().Add(header, value)
 			}
 		}
-		w.WriteHeader(newResponse.StatusCode)
+		if !(forceStream && !requestUseStream) {
+			w.WriteHeader(newResponse.StatusCode)
+		}
 		if contentType := filterHeaderFlags(newResponse.Header.Get("Content-Type")); contentType == "text/event-stream" {
 			var detectors map[int]*RepeatDetector
 			if detectRepeat {
@@ -435,7 +437,7 @@ func buildProxy(
 			tokenFinishLatency = time.Since(createdAt)
 			if forceStream && !requestUseStream {
 				w.Header().Set("Content-Type", "application/json; charset=utf-8")
-				w.Header().Del("Content-Encoding")
+				w.WriteHeader(newResponse.StatusCode)
 				if choicesValue, exists := completion["choices"]; exists {
 					if choices, isArr := choicesValue.([]any); isArr {
 						for _, choiceValue := range choices {
