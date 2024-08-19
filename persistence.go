@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -9,22 +11,36 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	parser "github.com/MoonshotAI/moonpalace/predicate"
+
+	"github.com/mattn/go-sqlite3"
 )
 
-var persistence Persistence
+var (
+	persistence Persistence
+	tableInfos  []*tableInfo
+)
 
-const sqlDriver = "sqlite3"
+const sqlDriver = "moonshot_sqlite3"
 
 func init() {
+	sql.Register(sqlDriver, &sqlite3.SQLiteDriver{
+		ConnectHook: func(conn *sqlite3.SQLiteConn) error {
+			if err := conn.RegisterFunc("merge_cmpl", mergeCompletion, true); err != nil {
+				return err
+			}
+			return nil
+		},
+	})
 	persistence = NewPersistence(
 		sqlDriver,
 		"file:"+getPalaceSqlite(),
 	)
-	if err := persistence.createTable(); err != nil {
+	var err error
+	if err = persistence.createTable(); err != nil {
 		logFatal(err)
 	}
-	tableInfos, err := persistence.inspectTable()
+	tableInfos, err = persistence.inspectTable()
 	if err != nil {
 		logFatal(err)
 	}
@@ -63,7 +79,25 @@ type tableInfo struct {
 	PrimaryKey   bool           `db:"pk"`
 }
 
-//go:generate defc generate --features sqlx/nort
+func tableFields(exclude ...string) (fields string) {
+	in := func(f string) bool {
+		for _, ex := range exclude {
+			if ex == f {
+				return true
+			}
+		}
+		return false
+	}
+	fieldList := make([]string, 0, len(tableInfos))
+	for _, info := range tableInfos {
+		if !in(info.Name) {
+			fieldList = append(fieldList, info.Name)
+		}
+	}
+	return strings.Join(fieldList, ",")
+}
+
+//go:generate defc generate --features sqlx/nort --func fields=tableFields
 type Persistence interface {
 	// createTable exec const
 	/*
@@ -89,6 +123,8 @@ type Persistence interface {
 			response_header        text,
 		    response_body          text,
 			error                  text,
+			response_ttft          integer,
+			latency 			   integer,
 			created_at             text default (datetime('now', 'localtime')) not null
 		);
 	*/
@@ -183,15 +219,27 @@ type Persistence interface {
 	// ListRequests query many named
 	/*
 		select *
-		from moonshot_requests
+		from (
+			select
+				{{ fields "response_body" }},
+				iif(
+					response_content_type = 'text/event-stream',
+					merge_cmpl(response_body),
+					response_body
+				) as response_body
+			from moonshot_requests
+		)
 		where 1 = 1
 		  {{ if .chatOnly }}
 		  and request_path like '%/chat/completions'
 		  {{ end }}
+		  {{ if .predicate }}
+		  and ({{ .predicate }})
+		  {{ end }}
 		order by id desc
 		limit :n;
 	*/
-	ListRequests(n int64, chatOnly bool) ([]*Request, error)
+	ListRequests(n int64, chatOnly bool, predicate string) ([]*Request, error)
 
 	// GetRequest query one named
 	/*
@@ -384,11 +432,11 @@ func marshalBody(body string) any {
 }
 
 func formatJSON(s string) string {
-	bytes, err := json.MarshalIndent(json.RawMessage(s), "", "    ")
+	jsonBytes, err := json.MarshalIndent(json.RawMessage(s), "", "    ")
 	if err != nil {
 		return s
 	} else {
-		return string(bytes)
+		return string(jsonBytes)
 	}
 }
 
@@ -417,4 +465,42 @@ func (t *SqliteTime) Scan(src any) (err error) {
 		return err
 	}
 	return nil
+}
+
+// FIXME mergeCompletion
+// Since the standard for text/event-stream is actually separated by two newline characters,
+// it means that each chunk of content can be line-wrapped. However, currently, because the
+// server does not output JSON with newline characters, the current method (parsing line by
+// line) also works fine but still needs improvement.
+
+func mergeCompletion(data string) string {
+	completion := completionPool.Get().(map[string]any)
+	defer putCompletion(completion)
+	scanner := bufio.NewScanner(strings.NewReader(data))
+	for scanner.Scan() {
+		if line := bytes.TrimSpace(scanner.Bytes()); len(line) != 0 {
+			if line = bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:"))); !bytes.Equal(line, []byte("[DONE]")) {
+				mergeIn(completion, line)
+			}
+		}
+	}
+	merged, _ := json.Marshal(completion)
+	return string(merged)
+}
+
+type Predicates []string
+
+func (p Predicates) Parse() (string, error) {
+	var sqlBuilder strings.Builder
+	for i, predicate := range p {
+		if i > 0 {
+			sqlBuilder.WriteString(" and ")
+		}
+		parsed, err := parser.Parse(predicate)
+		if err != nil {
+			return "", err
+		}
+		sqlBuilder.WriteString("(" + parsed + ")")
+	}
+	return sqlBuilder.String(), nil
 }

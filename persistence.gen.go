@@ -68,12 +68,12 @@ func (__imp *implPersistence) Close() error {
 var (
 	_ = (*template.Template)(nil)
 
-	__PersistenceBaseTemplate = template.Must(template.New("PersistenceBaseTemplate").Funcs(template.FuncMap{"bindvars": __PersistenceBindVars}).Parse(""))
+	__PersistenceBaseTemplate = template.Must(template.New("PersistenceBaseTemplate").Funcs(template.FuncMap{"bindvars": __PersistenceBindVars, "fields": tableFields}).Parse(""))
 
 	sqlTmpladdTTFTField    = template.Must(__PersistenceBaseTemplate.New("addTTFTField").Parse("alter table moonshot_requests add response_ttft integer;\r\n"))
 	sqlTmpladdLatencyField = template.Must(__PersistenceBaseTemplate.New("addLatencyField").Parse("alter table moonshot_requests add latency integer;\r\n"))
 	sqlTmplPersistence     = template.Must(__PersistenceBaseTemplate.New("Persistence").Parse("insert into moonshot_requests ( request_method, request_path, request_query, created_at {{ if .requestContentType }},request_content_type{{ end }} {{ if .requestID }},request_id{{ end }} {{ if .moonshotID }},moonshot_id{{ end }} {{ if .moonshotGID }},moonshot_gid{{ end }} {{ if .moonshotUID }},moonshot_uid{{ end }} {{ if .moonshotRequestID }},moonshot_request_id{{ end }} {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }} {{ if .responseStatusCode }},response_status_code{{ end }} {{ if .responseContentType }},response_content_type{{ end }} {{ if .requestHeader }},request_header{{ end }} {{ if .requestBody }},request_body{{ end }} {{ if .responseHeader }},response_header{{ end }} {{ if .responseBody }},response_body{{ end }} {{ if .programError }},error{{ end }} {{ if .responseTTFT }},response_ttft{{ end }} {{ if .latency }},latency{{ end }} ) values ( :requestMethod, :requestPath, :requestQuery, :createdAt {{ if .requestContentType }},:requestContentType{{ end }} {{ if .requestID }},:requestID{{ end }} {{ if .moonshotID }},:moonshotID{{ end }} {{ if .moonshotGID }},:moonshotGID{{ end }} {{ if .moonshotUID }},:moonshotUID{{ end }} {{ if .moonshotRequestID }},:moonshotRequestID{{ end }} {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }} {{ if .responseStatusCode }},:responseStatusCode{{ end }} {{ if .responseContentType }},:responseContentType{{ end }} {{ if .requestHeader }},:requestHeader{{ end }} {{ if .requestBody }},:requestBody{{ end }} {{ if .responseHeader }},:responseHeader{{ end }} {{ if .responseBody }},:responseBody{{ end }} {{ if .programError }},:programError{{ end }} {{ if .responseTTFT }},:responseTTFT{{ end }} {{ if .latency }},:latency{{ end }} );\r\nselect last_insert_rowid();\r\n"))
-	sqlTmplListRequests    = template.Must(__PersistenceBaseTemplate.New("ListRequests").Parse("select * from moonshot_requests where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} order by id desc limit :n;\r\n"))
+	sqlTmplListRequests    = template.Must(__PersistenceBaseTemplate.New("ListRequests").Parse("select * from ( select {{ fields \"response_body\" }}, iif( response_content_type = 'text/event-stream', merge_cmpl(response_body), response_body ) as response_body from moonshot_requests ) where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} {{ if .predicate }} and ({{ .predicate }}) {{ end }} order by id desc limit :n;\r\n"))
 	sqlTmplGetRequest      = template.Must(__PersistenceBaseTemplate.New("GetRequest").Parse("select * from moonshot_requests where 1 = 1 {{ if .id }} and id = :id {{ end }} {{ if .chatcmpl }} and moonshot_id = :chatcmpl {{ end }} {{ if .requestid }} and moonshot_request_id = :requestid {{ end }} ;\r\n"))
 )
 
@@ -85,7 +85,7 @@ func (__imp *implPersistence) createTable() error {
 
 	argListcreateTable = __PersistenceArguments{}
 
-	querycreateTable := "create table if not exists moonshot_requests ( id                     integer not null constraint moonshot_requests_pk primary key autoincrement, request_method         text    not null, request_path           text    not null, request_query          text    not null, request_content_type   text, request_id             text, moonshot_id            text, moonshot_gid           text, moonshot_uid           text, moonshot_request_id    text, moonshot_server_timing integer, response_status_code   integer, response_content_type  text, request_header         text, request_body           text, response_header        text, response_body          text, error                  text, created_at             text default (datetime('now', 'localtime')) not null );\r\n"
+	querycreateTable := "create table if not exists moonshot_requests ( id                     integer not null constraint moonshot_requests_pk primary key autoincrement, request_method         text    not null, request_path           text    not null, request_query          text    not null, request_content_type   text, request_id             text, moonshot_id            text, moonshot_gid           text, moonshot_uid           text, moonshot_request_id    text, moonshot_server_timing integer, response_status_code   integer, response_content_type  text, request_header         text, request_body           text, response_header        text, response_body          text, error                  text, response_ttft          integer, latency \t\t\t   integer, created_at             text default (datetime('now', 'localtime')) not null );\r\n"
 
 	txcreateTable, errcreateTable := __imp.__core.Beginx()
 	if errcreateTable != nil {
@@ -434,7 +434,7 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 	return v0Persistence, nil
 }
 
-func (__imp *implPersistence) ListRequests(n int64, chatOnly bool) ([]*Request, error) {
+func (__imp *implPersistence) ListRequests(n int64, chatOnly bool, predicate string) ([]*Request, error) {
 	var (
 		v0ListRequests  []*Request
 		errListRequests error
@@ -445,8 +445,9 @@ func (__imp *implPersistence) ListRequests(n int64, chatOnly bool) ([]*Request, 
 	defer sqlListRequests.Reset()
 
 	if errListRequests = sqlTmplListRequests.Execute(sqlListRequests, map[string]any{
-		"n":        n,
-		"chatOnly": chatOnly,
+		"n":         n,
+		"chatOnly":  chatOnly,
+		"predicate": predicate,
 	}); errListRequests != nil {
 		return v0ListRequests, fmt.Errorf("error executing %s template: %w", strconv.Quote("ListRequests"), errListRequests)
 	}
@@ -462,8 +463,9 @@ func (__imp *implPersistence) ListRequests(n int64, chatOnly bool) ([]*Request, 
 	}
 
 	argsListRequests := __PersistenceMergeNamedArgs(map[string]any{
-		"n":        n,
-		"chatOnly": chatOnly,
+		"n":         n,
+		"chatOnly":  chatOnly,
+		"predicate": predicate,
 	})
 
 	sqlSliceListRequests := __PersistenceSplit(queryListRequests, ";")

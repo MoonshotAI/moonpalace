@@ -13,6 +13,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mattn/go-runewidth"
+	"github.com/mattn/go-sqlite3"
 	"github.com/spf13/cobra"
 )
 
@@ -42,16 +43,26 @@ var style = table.Style{
 
 func listCommand() *cobra.Command {
 	var (
-		n        int64
-		verbose  bool
-		chatOnly bool
+		n          int64
+		verbose    bool
+		chatOnly   bool
+		predicates []string
 	)
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "Query Moonshot AI requests based on conditions",
 		Run: func(cmd *cobra.Command, args []string) {
-			requests, err := persistence.ListRequests(n, chatOnly)
+			var predicate string
+			if parsed, err := Predicates(predicates).Parse(); err != nil {
+				logFatal(fmt.Errorf("predicate: %w", err))
+			} else {
+				predicate = parsed
+			}
+			requests, err := persistence.ListRequests(n, chatOnly, predicate)
 			if err != nil {
+				if sqliteErr := new(sqlite3.Error); errors.As(err, sqliteErr) {
+					logFatal(sqliteErr)
+				}
 				logFatal(err)
 			}
 			if verbose {
@@ -73,7 +84,6 @@ func listCommand() *cobra.Command {
 					"status",
 					"chatcmpl",
 					"request_id",
-					"server_timing",
 					"requested_at",
 				})
 			}
@@ -94,10 +104,9 @@ func listCommand() *cobra.Command {
 				} else {
 					t.AppendRow(table.Row{
 						strconv.FormatInt(request.ID, 10),
-						strconv.FormatInt(request.ResponseStatusCode.Int64, 10),
+						http.StatusText(int(request.ResponseStatusCode.Int64)),
 						request.ChatCmpl(),
 						request.MoonshotRequestID.String,
-						strconv.FormatInt(request.MoonshotServerTiming.Int64, 10),
 						request.CreatedAt.Format(time.DateTime),
 					})
 				}
@@ -109,6 +118,7 @@ func listCommand() *cobra.Command {
 	flags.Int64VarP(&n, "n", "n", 10, "number of results to return")
 	flags.BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	flags.BoolVar(&chatOnly, "chatonly", false, "chat only output")
+	flags.StringArrayVar(&predicates, "predicate", nil, "predicate is used to set the conditions for query requests")
 	return cmd
 }
 
