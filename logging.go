@@ -18,12 +18,14 @@ var (
 )
 
 var (
-	boldWhite  = color.New(color.FgHiWhite, color.Bold).SprintfFunc()
-	boldGreen  = color.New(color.FgGreen, color.Bold).SprintfFunc()
-	boldYellow = color.New(color.FgYellow, color.Bold).SprintfFunc()
-	boldRed    = color.New(color.FgRed, color.Bold).SprintfFunc()
-	green      = color.New(color.FgHiGreen).SprintfFunc()
-	red        = color.New(color.FgRed).SprintfFunc()
+	boldWhite   = color.New(color.FgHiWhite, color.Bold).SprintFunc()
+	boldGreen   = color.New(color.FgGreen, color.Bold).SprintFunc()
+	boldGreenf  = color.New(color.FgGreen, color.Bold).SprintfFunc()
+	boldYellow  = color.New(color.FgYellow, color.Bold).SprintFunc()
+	boldYellowf = color.New(color.FgYellow, color.Bold).SprintfFunc()
+	boldRed     = color.New(color.FgRed, color.Bold).SprintFunc()
+	green       = color.New(color.FgHiGreen).SprintFunc()
+	red         = color.New(color.FgRed).SprintFunc()
 )
 
 const asciiMoonPalace = `
@@ -69,7 +71,7 @@ func logRequest(
 		responseStatus = red(responseStatus)
 	}
 	logger.Printf("%s %s %s %.2fs\n",
-		boldYellow(fmt.Sprintf("%-6s", method)),
+		boldYellowf("%-6s", method),
 		boldWhite(path),
 		responseStatus,
 		float64(latency)/float64(time.Second),
@@ -137,7 +139,7 @@ func logRequest(
 func logNewRow(id int64) {
 	logger.Println(
 		boldWhite("  New Row Inserted:"),
-		boldGreen(fmt.Sprintf("last_insert_id=%d", id)),
+		boldGreenf("last_insert_id=%d", id),
 	)
 }
 
