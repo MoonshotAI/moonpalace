@@ -109,23 +109,23 @@ type Persistence interface {
 		    request_method         text    not null,
 		    request_path           text    not null,
 		    request_query          text    not null,
-			request_content_type   text,
+		    request_content_type   text,
 		    request_id             text,
 		    moonshot_id            text,
 		    moonshot_gid           text,
 		    moonshot_uid           text,
 		    moonshot_request_id    text,
 		    moonshot_server_timing integer,
-			response_status_code   integer,
-			response_content_type  text,
-			request_header         text,
+		    response_status_code   integer,
+		    response_content_type  text,
+		    request_header         text,
 		    request_body           text,
-			response_header        text,
+		    response_header        text,
 		    response_body          text,
-			error                  text,
-			response_ttft          integer,
-			latency 			   integer,
-			created_at             text default (datetime('now', 'localtime')) not null
+		    error                  text,
+		    response_ttft          integer,
+		    latency 			   integer,
+		    created_at             text default (datetime('now', 'localtime')) not null
 		);
 	*/
 	createTable() error
@@ -149,19 +149,19 @@ type Persistence interface {
 	// Persistence query one named
 	/*
 		insert into moonshot_requests (
-			request_method,
+		    request_method,
 		    request_path,
-			request_query,
-			created_at
-			{{ if .requestContentType }},request_content_type{{ end }}
+		    request_query,
+		    created_at
+		    {{ if .requestContentType }},request_content_type{{ end }}
 		    {{ if .requestID }},request_id{{ end }}
 		    {{ if .moonshotID }},moonshot_id{{ end }}
 		    {{ if .moonshotGID }},moonshot_gid{{ end }}
 		    {{ if .moonshotUID }},moonshot_uid{{ end }}
 		    {{ if .moonshotRequestID }},moonshot_request_id{{ end }}
 		    {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }}
-			{{ if .responseStatusCode }},response_status_code{{ end }}
-			{{ if .responseContentType }},response_content_type{{ end }}
+		    {{ if .responseStatusCode }},response_status_code{{ end }}
+		    {{ if .responseContentType }},response_content_type{{ end }}
 		    {{ if .requestHeader }},request_header{{ end }}
 		    {{ if .requestBody }},request_body{{ end }}
 		    {{ if .responseHeader }},response_header{{ end }}
@@ -170,19 +170,19 @@ type Persistence interface {
 		    {{ if .responseTTFT }},response_ttft{{ end }}
 		    {{ if .latency }},latency{{ end }}
 		) values (
-			:requestMethod,
+		    :requestMethod,
 		    :requestPath,
-			:requestQuery,
-			:createdAt
-			{{ if .requestContentType }},:requestContentType{{ end }}
+		    :requestQuery,
+		    :createdAt
+		    {{ if .requestContentType }},:requestContentType{{ end }}
 		    {{ if .requestID }},:requestID{{ end }}
 		    {{ if .moonshotID }},:moonshotID{{ end }}
 		    {{ if .moonshotGID }},:moonshotGID{{ end }}
 		    {{ if .moonshotUID }},:moonshotUID{{ end }}
 		    {{ if .moonshotRequestID }},:moonshotRequestID{{ end }}
 		    {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }}
-			{{ if .responseStatusCode }},:responseStatusCode{{ end }}
-			{{ if .responseContentType }},:responseContentType{{ end }}
+		    {{ if .responseStatusCode }},:responseStatusCode{{ end }}
+		    {{ if .responseContentType }},:responseContentType{{ end }}
 		    {{ if .requestHeader }},:requestHeader{{ end }}
 		    {{ if .requestBody }},:requestBody{{ end }}
 		    {{ if .responseHeader }},:responseHeader{{ end }}

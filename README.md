@@ -107,6 +107,24 @@ MoonPalace 会以日志的形式将请求的细节在命令行中输出（假如
 
 注：在日志中，Response Headers 中的 `Msh-Request-Id` 字段的值对应下文中**检索请求**、**导出请求**中的 `--requestid` 参数的值，Response 中的 `id` 对应 `--chatcmpl` 参数的值，`last_insert_id` 对应 `--id` 参数的值。
 
+#### 使用 `config.yaml` 进行配置
+
+在 `$HOME/.moonpalace/` 目录下新建配置文件 `config.yaml`，即可对 `moonpalace start` 命令进行配置，免去每次启动时输入复杂命令的烦恼。
+
+配置文件的格式如下：
+
+```yaml
+start:
+    port: 8080                                               # 对应 --port              命令行参数
+    key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 对应 --key               命令行参数
+    detect-repeat:                                           # 对应 --detect-repeat     命令行选项
+        threshold: 0.5                                       # 对应 --repeat-threshold  命令行参数
+        min-length: 100                                      # 对应 --repeat-min-length 命令行参数
+    force-stream: true                                       # 对应 --force-stream      命令行选项
+```
+
+**注意：当命令行参数与 `config.yaml` 配置文件参数同时出现时，会优先使用命令行参数。**
+
 #### 内容被截断检测
 
 MoonPalace 可以检测当前 Kimi 大模型输出的内容是否被截断、或内容不完整（这一功能默认被启用）。当 MoonPalace 检测到输出的内容被截断或不完整时，会在日志中输出：
@@ -219,6 +237,38 @@ $ moonpalace inspect --chatcmpl chatcmpl-2e1aa823e2c94ebdad66450a0e6df088 --prin
 +--------------------------------------------------+--------------------------------------------------+
 ```
 
+#### 使用 `--predicate` 参数筛选请求
+
+MoonPalace 提供了简单的表达式来筛选被捕获的请求，例如：
+
+```shell
+$ moonpalace list \
+    --predicate "request_body.model == 'moonshot-v1-128k' || request_body.model == 'moonshot-v1-8k'" \
+    --predicate "response_body.choices.0.finish_reason == 'length'"
+```
+
+`--predicate` 支持的表达式形式为：
+
+```
+Field Operator Literal
+```
+
+其中，`Field` 为 `sqlite` 数据库表的字段名，详细的表结构请参考 [persistence.go](https://github.com/MoonshotAI/moonpalace/blob/main/persistence.go#L70)；`Operator` 为运算符，当前支持的运算符为 `==`、`!=`、`>`、`>=`、`<`、`<=`、`~`，其中，`~` 为近似匹配符，仅适用于字符串近似匹配（等价于 `LIKE`）；`Literal` 为字面量，支持单双引号字符串、整数和浮点数数值、布尔值和 `NULL`。
+
+多个表达式之间，可以使用 `&&` 和 `||` 进行组合，代表“且”和“或”。
+
+对于 `JSON` 格式的字段，可以使用 `.` 获取 `JSON` 的某个字段的值或数组中的某个元素的值，例如 `response_body.choices.0.finish_reason`。
+
+某些特殊字段的对应关系：
+
+| 展示字段名称      | 存储字段名称             |
+| --------------- | ------------------------ |
+| `status`        | `request_status_code`    |
+| `chatcmpl`      | `moonshot_id`            |
+| `request_id`    | `moonshot_request_id`    |
+| `server_timing` | `moonshot_server_timing` |
+| `requested_at`  | `created_at`             |
+
 ### 导出请求
 
 当你认为某个请求不符合预期，或是想向 Moonshot AI 报告某个请求时（无论是 Good Case 还是 Bad Case，我们都欢迎），你可以使用 `export` 命令导出特定的请求：
@@ -285,7 +335,7 @@ $ cat $HOME/Downloads/chatcmpl-2e1aa823e2c94ebdad66450a0e6df088.json
 ## TODO
 
 - [ ] 使用 Kimi 大模型解决调试过程中的错误；
-- [ ] 更多的检索选项，通过请求体或响应体中的 JSON 字段检索请求；
+- [x] 更多的检索选项，通过请求体或响应体中的 JSON 字段检索请求；
 - [ ] 批量导出功能；
 - [ ] 自动上报，无需手动投递；
 - [ ] 提供 API Server Mock 功能；
