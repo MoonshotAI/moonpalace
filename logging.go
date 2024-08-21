@@ -151,6 +151,10 @@ func logNewRow(id int64) {
 	)
 }
 
+func logExport(file *os.File) {
+	logger.Println("export to", boldGreen(file.Name()), "successfully")
+}
+
 func logFatal(err error) {
 	if errorMsg := err.Error(); errorMsg != "" {
 		for _, line := range strings.Split(errorMsg, "\n") {

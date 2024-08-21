@@ -47,30 +47,8 @@ func exportCommand() *cobra.Command {
 			}
 			var outputStream io.Writer
 			if directory != "" {
-				var filename string
-				ident := request.Ident()
-				if strings.HasPrefix(ident, "chatcmpl=") {
-					filename = strings.TrimPrefix(ident, "chatcmpl=") + ".json"
-				} else if strings.HasPrefix(ident, "requestid=") {
-					filename = "requestid-" + strings.TrimPrefix(ident, "requestid=") + ".json"
-				} else {
-					var filenameBuilder strings.Builder
-					filenameBuilder.WriteString(strings.ToLower(request.RequestMethod))
-					filenameBuilder.WriteString("-")
-					filenameBuilder.WriteString(
-						strings.ReplaceAll(
-							strings.TrimPrefix(request.RequestPath, "/v1/"),
-							"/", "."),
-					)
-					if request.MoonshotUID.Valid {
-						filenameBuilder.WriteString("-")
-						filenameBuilder.WriteString(request.MoonshotUID.String)
-					}
-					filenameBuilder.WriteString("-")
-					filenameBuilder.WriteString(request.CreatedAt.Format("20060102150405"))
-					filename = filenameBuilder.String() + ".json"
-				}
-				file, err := os.Create(filepath.Join(directory, filename))
+				var file *os.File
+				file, err = os.Create(filepath.Join(directory, genFilename(request)))
 				if err != nil {
 					logFatal(err)
 				}
@@ -105,7 +83,7 @@ func exportCommand() *cobra.Command {
 	flags.StringVar(&requestID, "requestid", "", "request id returned from Moonshot AI")
 	flags.StringVarP(&output, "output", "o", "stdout", "output file path")
 	flags.StringVar(&directory, "directory", "", "output directory")
-	flags.BoolVar(&escapeHTML, "espacehtml", false, "specifies whether problematic HTML characters should be escaped")
+	flags.BoolVar(&escapeHTML, "escape-html", false, "specifies whether problematic HTML characters should be escaped")
 	flags.BoolVar(&goodCase, "good", false, "good case")
 	flags.BoolVar(&badCase, "bad", false, "bad case")
 	flags.StringArrayVar(&tags, "tag", nil, "tags describe the current case")
@@ -114,4 +92,29 @@ func exportCommand() *cobra.Command {
 	cmd.MarkPersistentFlagFilename("output")
 	cmd.MarkPersistentFlagDirname("directory")
 	return cmd
+}
+
+func genFilename(request *Request) (filename string) {
+	if ident := request.Ident(); strings.HasPrefix(ident, "chatcmpl=") {
+		filename = strings.TrimPrefix(ident, "chatcmpl=") + ".json"
+	} else if strings.HasPrefix(ident, "requestid=") {
+		filename = "requestid-" + strings.TrimPrefix(ident, "requestid=") + ".json"
+	} else {
+		var filenameBuilder strings.Builder
+		filenameBuilder.WriteString(strings.ToLower(request.RequestMethod))
+		filenameBuilder.WriteString("-")
+		filenameBuilder.WriteString(
+			strings.ReplaceAll(
+				strings.TrimPrefix(request.RequestPath, "/v1/"),
+				"/", "."),
+		)
+		if request.MoonshotUID.Valid {
+			filenameBuilder.WriteString("-")
+			filenameBuilder.WriteString(request.MoonshotUID.String)
+		}
+		filenameBuilder.WriteString("-")
+		filenameBuilder.WriteString(request.CreatedAt.Format("20060102150405"))
+		filename = filenameBuilder.String() + ".json"
+	}
+	return filename
 }

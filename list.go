@@ -2,10 +2,12 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +49,8 @@ func listCommand() *cobra.Command {
 		verbose    bool
 		chatOnly   bool
 		predicates []string
+		export     string
+		escapeHTML bool
 	)
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -58,12 +62,35 @@ func listCommand() *cobra.Command {
 			} else {
 				predicate = parsed
 			}
+			// If an export request is needed and the n value is not set,
+			// then there is no limit to the number of queries.
+			if export != "" && !cmd.Flags().Changed("n") {
+				n = 0
+			}
 			requests, err := persistence.ListRequests(n, chatOnly, predicate)
 			if err != nil {
 				if sqliteErr := new(sqlite3.Error); errors.As(err, sqliteErr) {
 					logFatal(sqliteErr)
 				}
 				logFatal(err)
+			}
+			if export != "" {
+				for _, request := range requests {
+					var file *os.File
+					file, err = os.Create(filepath.Join(export, genFilename(request)))
+					if err != nil {
+						logFatal(err)
+					}
+					encoder := json.NewEncoder(file)
+					encoder.SetIndent("", "    ")
+					encoder.SetEscapeHTML(escapeHTML)
+					if err = encoder.Encode(request); err != nil {
+						logFatal(err)
+					}
+					logExport(file)
+					file.Close()
+				}
+				return
 			}
 			if verbose {
 				t.AppendHeader(table.Row{
@@ -119,6 +146,9 @@ func listCommand() *cobra.Command {
 	flags.BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	flags.BoolVar(&chatOnly, "chatonly", false, "chat only output")
 	flags.StringArrayVar(&predicates, "predicate", nil, "predicate is used to set the conditions for query requests")
+	flags.StringVar(&export, "export", "", "export requests to directory")
+	flags.BoolVar(&escapeHTML, "escape-html", false, "specifies whether problematic HTML characters should be escaped")
+	cmd.MarkPersistentFlagDirname("export")
 	return cmd
 }
 
@@ -143,10 +173,12 @@ func inspectCommand() *cobra.Command {
 		n++
 	}
 	var (
-		id           int64
-		chatcmpl     string
-		requestID    string
-		printColumns []string
+		id                          int64
+		chatcmpl                    string
+		requestID                   string
+		printColumns                []string
+		printRequest, printResponse bool
+		mergeEventStream            bool
 	)
 	cmd := &cobra.Command{
 		Use:   "inspect",
@@ -158,6 +190,14 @@ func inspectCommand() *cobra.Command {
 					logFatal(sql.ErrNoRows)
 				}
 				logFatal(err)
+			}
+			switch {
+			case printRequest:
+				request.PrintRequest(os.Stdout)
+				return
+			case printResponse:
+				request.PrintResponse(os.Stdout, mergeEventStream)
+				return
 			}
 			header := make(table.Row, 0, 2)
 			for _, column := range printColumns {
@@ -206,7 +246,11 @@ func inspectCommand() *cobra.Command {
 	flags.StringVar(&chatcmpl, "chatcmpl", "", "chatcmpl")
 	flags.StringVar(&requestID, "requestid", "", "request id returned from Moonshot AI")
 	flags.StringSliceVar(&printColumns, "print", []string{"metadata"}, "columns to print, available columns are "+columnsBuilder.String())
+	flags.BoolVar(&printRequest, "print-request", false, "print the request information in HTTP format")
+	flags.BoolVar(&printResponse, "print-response", false, "print the response information in HTTP format")
+	flags.BoolVar(&mergeEventStream, "merge-event-stream", false, "merge response event stream")
 	cmd.MarkFlagsOneRequired("id", "chatcmpl", "requestid")
+	cmd.MarkFlagsMutuallyExclusive("print", "print-request", "print-response")
 	return cmd
 }
 

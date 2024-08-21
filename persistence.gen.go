@@ -73,7 +73,6 @@ var (
 	sqlTmpladdTTFTField    = template.Must(__PersistenceBaseTemplate.New("addTTFTField").Parse("alter table moonshot_requests add response_ttft integer;\r\n"))
 	sqlTmpladdLatencyField = template.Must(__PersistenceBaseTemplate.New("addLatencyField").Parse("alter table moonshot_requests add latency integer;\r\n"))
 	sqlTmplPersistence     = template.Must(__PersistenceBaseTemplate.New("Persistence").Parse("insert into moonshot_requests ( request_method, request_path, request_query, created_at {{ if .requestContentType }},request_content_type{{ end }} {{ if .requestID }},request_id{{ end }} {{ if .moonshotID }},moonshot_id{{ end }} {{ if .moonshotGID }},moonshot_gid{{ end }} {{ if .moonshotUID }},moonshot_uid{{ end }} {{ if .moonshotRequestID }},moonshot_request_id{{ end }} {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }} {{ if .responseStatusCode }},response_status_code{{ end }} {{ if .responseContentType }},response_content_type{{ end }} {{ if .requestHeader }},request_header{{ end }} {{ if .requestBody }},request_body{{ end }} {{ if .responseHeader }},response_header{{ end }} {{ if .responseBody }},response_body{{ end }} {{ if .programError }},error{{ end }} {{ if .responseTTFT }},response_ttft{{ end }} {{ if .latency }},latency{{ end }} ) values ( :requestMethod, :requestPath, :requestQuery, :createdAt {{ if .requestContentType }},:requestContentType{{ end }} {{ if .requestID }},:requestID{{ end }} {{ if .moonshotID }},:moonshotID{{ end }} {{ if .moonshotGID }},:moonshotGID{{ end }} {{ if .moonshotUID }},:moonshotUID{{ end }} {{ if .moonshotRequestID }},:moonshotRequestID{{ end }} {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }} {{ if .responseStatusCode }},:responseStatusCode{{ end }} {{ if .responseContentType }},:responseContentType{{ end }} {{ if .requestHeader }},:requestHeader{{ end }} {{ if .requestBody }},:requestBody{{ end }} {{ if .responseHeader }},:responseHeader{{ end }} {{ if .responseBody }},:responseBody{{ end }} {{ if .programError }},:programError{{ end }} {{ if .responseTTFT }},:responseTTFT{{ end }} {{ if .latency }},:latency{{ end }} );\r\nselect last_insert_rowid();\r\n"))
-	sqlTmplListRequests    = template.Must(__PersistenceBaseTemplate.New("ListRequests").Parse("select * from ( select {{ fields \"response_body\" }}, iif( response_content_type = 'text/event-stream' and response_body is not null, merge_cmpl(response_body), response_body ) as response_body from moonshot_requests ) where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} {{ if .predicate }} and ({{ .predicate }}) {{ end }} order by id desc limit :n;\r\n"))
 	sqlTmplGetRequest      = template.Must(__PersistenceBaseTemplate.New("GetRequest").Parse("select * from moonshot_requests where 1 = 1 {{ if .id }} and id = :id {{ end }} {{ if .chatcmpl }} and moonshot_id = :chatcmpl {{ end }} {{ if .requestid }} and moonshot_request_id = :requestid {{ end }} ;\r\n"))
 )
 
@@ -436,9 +435,16 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 
 func (__imp *implPersistence) ListRequests(n int64, chatOnly bool, predicate string) ([]*Request, error) {
 	var (
-		v0ListRequests  []*Request
-		errListRequests error
+		v0ListRequests      []*Request
+		errListRequests     error
+		argListListRequests = make(__PersistenceArguments, 0, 8)
 	)
+
+	__ListRequestsBindFunc := func(arg any) string {
+		argListListRequests = append(argListListRequests, arg)
+		return __PersistenceBindVars(len(__PersistenceMergeArgs(arg)))
+	}
+	sqlTmplListRequests := template.Must(template.New("ListRequests").Funcs(template.FuncMap{"bind": __ListRequestsBindFunc, "bindvars": __PersistenceBindVars, "fields": tableFields}).Parse("select * from ( select {{ fields \"response_body\" }}, iif( response_content_type = 'text/event-stream' and response_body is not null, merge_cmpl(response_body), response_body ) as response_body from moonshot_requests ) where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} {{ if .predicate }} and ({{ .predicate }}) {{ end }} order by id desc {{ if .n }} limit {{ bind .n }} {{ end }} ;\r\n"))
 
 	sqlListRequests := __PersistenceGetBuffer()
 	defer __PersistencePutBuffer(sqlListRequests)
@@ -462,37 +468,26 @@ func (__imp *implPersistence) ListRequests(n int64, chatOnly bool, predicate str
 		defer txListRequests.Rollback()
 	}
 
-	argsListRequests := __PersistenceMergeNamedArgs(map[string]any{
-		"n":         n,
-		"chatOnly":  chatOnly,
-		"predicate": predicate,
-	})
+	offsetListRequests := 0
+	argsListRequests := __PersistenceMergeArgs(argListListRequests...)
 
 	sqlSliceListRequests := __PersistenceSplit(queryListRequests, ";")
 	for indexListRequests, splitSqlListRequests := range sqlSliceListRequests {
 		_ = indexListRequests
 
-		var listArgsListRequests []interface{}
-
-		splitSqlListRequests, listArgsListRequests, errListRequests = sqlx.Named(splitSqlListRequests, argsListRequests)
-		if errListRequests != nil {
-			return v0ListRequests, fmt.Errorf("error building %s query: %w", strconv.Quote("ListRequests"), errListRequests)
-		}
-
-		splitSqlListRequests, listArgsListRequests, errListRequests = sqlx.In(splitSqlListRequests, listArgsListRequests...)
-		if errListRequests != nil {
-			return v0ListRequests, fmt.Errorf("error building %s query: %w", strconv.Quote("ListRequests"), errListRequests)
-		}
+		countListRequests := __PersistenceCount(splitSqlListRequests, "?")
 
 		if indexListRequests < len(sqlSliceListRequests)-1 {
-			_, errListRequests = txListRequests.Exec(splitSqlListRequests, listArgsListRequests...)
+			_, errListRequests = txListRequests.Exec(splitSqlListRequests, argsListRequests[offsetListRequests:offsetListRequests+countListRequests]...)
 		} else {
-			errListRequests = txListRequests.Select(&v0ListRequests, splitSqlListRequests, listArgsListRequests...)
+			errListRequests = txListRequests.Select(&v0ListRequests, splitSqlListRequests, argsListRequests[offsetListRequests:offsetListRequests+countListRequests]...)
 		}
 
 		if errListRequests != nil {
 			return v0ListRequests, fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("ListRequests"), splitSqlListRequests, errListRequests)
 		}
+
+		offsetListRequests += countListRequests
 	}
 
 	if !__imp.__withTx {

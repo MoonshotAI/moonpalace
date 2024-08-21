@@ -678,10 +678,12 @@ func forceUseStream(data []byte, hasStreamKey bool) []byte {
 		newData = append(newData, data[insertIndex:]...)
 		return newData
 	}
-	data, _ = sjson.SetBytesOptions(data, "stream", true, &sjson.Options{
+	sjsonOption := &sjson.Options{
 		Optimistic:     true,
 		ReplaceInPlace: true,
-	})
+	}
+	data, _ = sjson.SetBytesOptions(data, "stream", true, sjsonOption)
+	data, _ = sjson.SetBytesOptions(data, "stream_options.include_usage", true, sjsonOption)
 	return data
 }
 
