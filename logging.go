@@ -104,11 +104,12 @@ func logRequest(
 		}
 		if usage := moonshot.Usage; usage != nil {
 			if tokenFinishLatency > 0 {
-				logger.Printf("    - tpot:              %.4fs/token\n",
-					((float64(tokenFinishLatency)-
-						float64(responseTTFT)*float64(time.Millisecond))/
-						float64(time.Second))/
-						float64(usage.CompletionTokens-1))
+				timePerOutputToken := ((float64(tokenFinishLatency) -
+					float64(responseTTFT)*float64(time.Millisecond)) /
+					float64(time.Second)) /
+					float64(usage.CompletionTokens-_boolToInt(responseTTFT != 0))
+				logger.Printf("    - tpot:              %.4fs/token\n", timePerOutputToken)
+				logger.Printf("    - otps:              %.4ftokens/s\n", 1/timePerOutputToken)
 			}
 			logger.Printf("    - prompt_tokens:     %d\n", usage.PromptTokens)
 			logger.Printf("    - completion_tokens: %d\n", usage.CompletionTokens)
@@ -134,6 +135,13 @@ func logRequest(
 			}
 		}
 	}
+}
+
+func _boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func logNewRow(id int64) {
