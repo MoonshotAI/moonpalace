@@ -431,28 +431,28 @@ func (r *Request) Inspection() (inspection map[string]string) {
 func (r *Request) PrintRequest(w io.Writer) {
 	fmt.Fprintf(w, "%s %s HTTP/1.1\n", r.RequestMethod, r.Url())
 	if r.RequestHeader.Valid {
-		fmt.Fprintf(w, "%s\n", r.RequestHeader.String)
-	}
-	if r.RequestBody.Valid {
-		w.Write([]byte("\n"))
-		w.Write([]byte(formatJSON(r.RequestBody.String)))
-		w.Write([]byte("\n"))
+		fmt.Fprintf(w, "%s\n", strings.TrimSpace(r.RequestHeader.String))
+		if r.RequestBody.Valid {
+			w.Write([]byte("\n"))
+			w.Write([]byte(formatJSON(r.RequestBody.String)))
+			w.Write([]byte("\n"))
+		}
 	}
 }
 
 func (r *Request) PrintResponse(w io.Writer, merge bool) {
 	fmt.Fprintf(w, "HTTP/1.1 %s\n", r.Status())
 	if r.ResponseHeader.Valid {
-		fmt.Fprintf(w, "%s\n", r.ResponseHeader.String)
-	}
-	if r.ResponseBody.Valid {
-		w.Write([]byte("\n"))
-		if merge && r.ResponseContentType.String == "text/event-stream" {
-			w.Write([]byte(formatJSON(mergeCompletion(r.ResponseBody.String))))
-		} else {
-			w.Write([]byte(formatJSON(r.ResponseBody.String)))
+		fmt.Fprintf(w, "%s\n", strings.TrimSpace(r.ResponseHeader.String))
+		if r.ResponseBody.Valid {
+			w.Write([]byte("\n"))
+			if merge && r.ResponseContentType.String == "text/event-stream" {
+				w.Write([]byte(formatJSON(mergeCompletion(r.ResponseBody.String))))
+			} else {
+				w.Write([]byte(formatJSON(r.ResponseBody.String)))
+			}
+			w.Write([]byte("\n"))
 		}
-		w.Write([]byte("\n"))
 	}
 }
 
