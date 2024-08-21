@@ -472,26 +472,28 @@ func buildProxy(
 					return
 				}
 			}
-			var completion MoonshotCompletion
-			if err = json.Unmarshal(responseBody, &completion); err == nil && completion.ID != "" {
-				if moonshot == nil {
-					moonshot = new(Moonshot)
-				}
-				moonshot.ID = completion.ID
-				moonshotID = moonshot.ID
-				if completion.Usage != nil {
-					moonshot.Usage = &MoonshotUsage{
-						PromptTokens:     completion.Usage.PromptTokens,
-						CompletionTokens: completion.Usage.CompletionTokens,
-						TotalTokens:      completion.Usage.TotalTokens,
-						CachedTokens:     completion.Usage.CachedTokens,
+			if requestPath == "/v1/chat/completions" && contentType == "application/json" {
+				var completion MoonshotCompletion
+				if err = json.Unmarshal(responseBody, &completion); err == nil && completion.ID != "" {
+					if moonshot == nil {
+						moonshot = new(Moonshot)
 					}
-				}
-				if completion.Choices != nil && len(completion.Choices) > 0 {
-					for _, choice := range completion.Choices {
-						if choice.FinishReason != nil && *choice.FinishReason == "length" {
-							err = fmt.Errorf("it seems that your max_tokens value is too small, please set a value greater than %d",
-								completion.Usage.CompletionTokens)
+					moonshot.ID = completion.ID
+					moonshotID = moonshot.ID
+					if completion.Usage != nil {
+						moonshot.Usage = &MoonshotUsage{
+							PromptTokens:     completion.Usage.PromptTokens,
+							CompletionTokens: completion.Usage.CompletionTokens,
+							TotalTokens:      completion.Usage.TotalTokens,
+							CachedTokens:     completion.Usage.CachedTokens,
+						}
+					}
+					if completion.Choices != nil && len(completion.Choices) > 0 {
+						for _, choice := range completion.Choices {
+							if choice.FinishReason != nil && *choice.FinishReason == "length" {
+								err = fmt.Errorf("it seems that your max_tokens value is too small, please set a value greater than %d",
+									completion.Usage.CompletionTokens)
+							}
 						}
 					}
 				}
