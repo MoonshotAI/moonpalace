@@ -3,7 +3,11 @@
 
 package main
 
-import "github.com/spf13/cobra"
+import (
+	"strings"
+
+	"github.com/spf13/cobra"
+)
 
 var endpoint string
 
