@@ -55,6 +55,9 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 		}
 		return EOF
 	}
+	if len(token) == 0 {
+		return Unknown
+	}
 	if token == "." {
 		return DOT
 	}
@@ -72,7 +75,7 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 		token = "'" + token + "'"
 		fallthrough
 	case '\'':
-		if !strings.HasSuffix(token, "'") {
+		if len(token) < 2 || !strings.HasSuffix(token, "'") {
 			return Unknown
 		}
 		lval.lit = token
@@ -109,7 +112,6 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 }
 
 func (l *lexer) Error(s string) {
-	var builder strings.Builder
 	index := strings.LastIndexFunc(l.raw[:l.idx], unicode.IsSpace)
 	if index < 0 {
 		index = 0
@@ -117,12 +119,11 @@ func (l *lexer) Error(s string) {
 		index += 1
 	}
 	snippet := l.raw[index:]
-	for i := 0; len(snippet) > 0 && i < 20; i++ {
-		r, size := utf8.DecodeRuneInString(snippet)
-		builder.WriteRune(r)
-		snippet = snippet[size:]
+	index = strings.IndexFunc(snippet, unicode.IsSpace)
+	if index < 0 {
+		index = len(snippet)
 	}
-	l.err = fmt.Errorf("%s near %q", s, builder.String())
+	l.err = fmt.Errorf("%s near %q", s, snippet[:index])
 }
 
 func (l *lexer) next() (string, bool) {
@@ -148,7 +149,7 @@ func (l *lexer) next() (string, bool) {
 				return string(ch), true
 			}
 		case ' ', '\t', '\n', '\r':
-			if doubleQuoted || singleQuoted {
+			if doubleQuoted || singleQuoted || backQuoted {
 				arg = append(arg, ch)
 			} else if len(arg) > 0 {
 				l.idx++
@@ -159,16 +160,28 @@ func (l *lexer) next() (string, bool) {
 				doubleQuoted = !doubleQuoted
 			}
 			arg = append(arg, ch)
+			if !doubleQuoted {
+				l.idx++
+				return string(arg), true
+			}
 		case '\'':
 			if !(l.idx > 0 && line[l.idx-1] == '\\' || doubleQuoted || backQuoted) {
 				singleQuoted = !singleQuoted
 			}
 			arg = append(arg, ch)
+			if !singleQuoted {
+				l.idx++
+				return string(arg), true
+			}
 		case '`':
 			if !(l.idx > 0 && line[l.idx-1] == '\\' || singleQuoted || doubleQuoted) {
 				backQuoted = !backQuoted
 			}
 			arg = append(arg, ch)
+			if !backQuoted {
+				l.idx++
+				return string(arg), true
+			}
 		default:
 			arg = append(arg, ch)
 		}
