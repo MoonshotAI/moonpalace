@@ -417,6 +417,10 @@ func buildProxy(
 														chunk.Model,
 														chunk.Object,
 													))
+													responseBody = append(responseBody, "data: "...)
+													responseBody = append(responseBody, finishChunk...)
+													responseBody = append(responseBody, "\n\n"...)
+													responseBody = append(responseBody, "data: [DONE]\n\n"...)
 													if forceStream && !requestUseStream {
 														mergeIn(completion, finishChunk)
 													} else {
@@ -427,7 +431,7 @@ func buildProxy(
 												}
 											}
 											if !(forceStream && !requestUseStream) {
-												responseWriter.Write([]byte("[DONE]"))
+												responseWriter.Write([]byte("data: [DONE]"))
 											}
 											break READLINES
 										}
@@ -495,8 +499,9 @@ func buildProxy(
 					if completion.Choices != nil && len(completion.Choices) > 0 {
 						for _, choice := range completion.Choices {
 							if choice.FinishReason != nil && *choice.FinishReason == "length" {
-								err = fmt.Errorf("it seems that your max_tokens value is too small, please set a value greater than %d",
-									completion.Usage.CompletionTokens)
+								warnings = append(warnings,
+									fmt.Errorf("it seems that your max_tokens value is too small, please set a value greater than %d",
+										completion.Usage.CompletionTokens))
 							}
 						}
 					}
