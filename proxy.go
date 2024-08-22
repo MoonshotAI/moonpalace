@@ -307,10 +307,11 @@ func buildProxy(
 				w.Header().Add(header, value)
 			}
 		}
-		if !(forceStream && !requestUseStream) {
+		responseContentType = filterHeaderFlags(newResponse.Header.Get("Content-Type"))
+		if !(forceStream && !requestUseStream && responseContentType == "text/event-stream") {
 			w.WriteHeader(newResponse.StatusCode)
 		}
-		if contentType := filterHeaderFlags(newResponse.Header.Get("Content-Type")); contentType == "text/event-stream" {
+		if responseContentType == "text/event-stream" {
 			var detectors map[int]*RepeatDetector
 			if detectRepeat {
 				detectors = detectorsPool.Get().(map[int]*RepeatDetector)
@@ -473,7 +474,7 @@ func buildProxy(
 					return
 				}
 			}
-			if requestPath == "/v1/chat/completions" && contentType == "application/json" {
+			if requestPath == "/v1/chat/completions" && responseContentType == "application/json" {
 				var completion MoonshotCompletion
 				if err = json.Unmarshal(responseBody, &completion); err == nil && completion.ID != "" {
 					if moonshot == nil {
@@ -521,7 +522,6 @@ func buildProxy(
 		moonshotContextCacheID = newResponse.Header.Get("Msh-Context-Cache-Id")
 		responseStatus = newResponse.Status
 		responseStatusCode = newResponse.StatusCode
-		responseContentType = filterHeaderFlags(newResponse.Header.Get("Content-Type"))
 		if responseStatusCode != http.StatusOK {
 			err = &moonshotError{message: string(responseBody)}
 		}
