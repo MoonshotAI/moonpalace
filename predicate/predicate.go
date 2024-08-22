@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -71,6 +72,9 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 		token = "'" + token + "'"
 		fallthrough
 	case '\'':
+		if !strings.HasSuffix(token, "'") {
+			return Unknown
+		}
 		lval.lit = token
 		return STRING
 	}
@@ -106,11 +110,17 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 
 func (l *lexer) Error(s string) {
 	var builder strings.Builder
-	rest := l.raw[l.idx:]
-	for i := 0; len(rest) > 0 && i < 20; i++ {
-		r, size := utf8.DecodeRuneInString(rest)
+	index := strings.LastIndexFunc(l.raw[:l.idx], unicode.IsSpace)
+	if index < 0 {
+		index = 0
+	} else {
+		index += 1
+	}
+	snippet := l.raw[index:]
+	for i := 0; len(snippet) > 0 && i < 20; i++ {
+		r, size := utf8.DecodeRuneInString(snippet)
 		builder.WriteRune(r)
-		rest = rest[size:]
+		snippet = snippet[size:]
 	}
 	l.err = fmt.Errorf("%s near %q", s, builder.String())
 }
