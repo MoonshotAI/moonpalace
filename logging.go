@@ -61,6 +61,7 @@ func logRequest(
 	latency time.Duration,
 	tokenFinishLatency time.Duration,
 	err error,
+	warnings []error,
 ) {
 	if query != "" {
 		path += "?" + query
@@ -133,6 +134,11 @@ func logRequest(
 			for _, line := range strings.Split(errorMsg, "\n") {
 				logger.Printf("%s%s\n", indent, render(line))
 			}
+		}
+	}
+	if len(warnings) > 0 {
+		for _, warning := range warnings {
+			logger.Printf("  %s %s\n", boldYellow("[WARNING]"), boldYellow(warning.Error()))
 		}
 	}
 }

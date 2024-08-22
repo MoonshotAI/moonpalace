@@ -162,6 +162,7 @@ func buildProxy(
 	return func(w http.ResponseWriter, r *http.Request) {
 		var (
 			err                       error
+			warnings                  []error
 			encoder                   = json.NewEncoder(w)
 			newRequest                *http.Request
 			newResponse               *http.Response
@@ -214,6 +215,7 @@ func buildProxy(
 					latency,
 					tokenFinishLatency,
 					err,
+					warnings,
 				)
 				var lastInsertID int64
 				lastInsertID, err = persistence.Persistence(
@@ -388,7 +390,7 @@ func buildProxy(
 										}
 									}
 									if choice.FinishReason != nil && *choice.FinishReason == "length" {
-										err = errors.New("it seems that your max_tokens value is too small, please set a larger value")
+										warnings = append(warnings, errors.New("it seems that your max_tokens value is too small, please set a larger value"))
 									}
 									if detectRepeat {
 										var detector *RepeatDetector
@@ -403,7 +405,7 @@ func buildProxy(
 										}
 										detector.Automaton.AddString(choice.Delta.Content)
 										if detector.Automaton.Length() > repeatMinLength && detector.Automaton.GetRepeatness() < repeatThreshold {
-											err = errors.New("it appears that there is an issue with content repeating in the current response")
+											warnings = append(warnings, errors.New("it appears that there is an issue with content repeating in the current response"))
 											for index, snapshot := range detectors {
 												if snapshot.FinishReason == "" {
 													finishChunk := []byte(fmt.Sprintf(
