@@ -106,7 +106,7 @@ func genFilename(request *Request) (filename string) {
 		filenameBuilder.WriteString(
 			strings.ReplaceAll(
 				strings.TrimPrefix(request.RequestPath, "/v1/"),
-				"/", "."),
+				"/", "-"),
 		)
 		if request.MoonshotUID.Valid {
 			filenameBuilder.WriteString("-")

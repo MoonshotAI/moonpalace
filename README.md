@@ -253,7 +253,7 @@ $ moonpalace list \
 Field Operator Literal
 ```
 
-其中，`Field` 为 `sqlite` 数据库表的字段名，详细的表结构请参考 [persistence.go](https://github.com/MoonshotAI/moonpalace/blob/main/persistence.go#L70)；`Operator` 为运算符，当前支持的运算符为 `==`、`!=`、`>`、`>=`、`<`、`<=`、`~`，其中，`~` 为近似匹配符，仅适用于字符串近似匹配（等价于 `LIKE`）；`Literal` 为字面量，支持单双引号字符串、整数和浮点数数值、布尔值和 `NULL`。
+其中，`Field` 为 `sqlite` 数据库表的字段名，详细的表结构请参考 [persistence.go](https://github.com/MoonshotAI/moonpalace/blob/main/persistence.go#L102)；`Operator` 为运算符，当前支持的运算符为 `==`、`!=`、`>`、`>=`、`<`、`<=`、`~`，其中，`~` 为近似匹配符，仅适用于字符串近似匹配（等价于 `LIKE`）；`Literal` 为字面量，支持单双引号字符串、整数和浮点数数值、布尔值和 `NULL`。
 
 多个表达式之间，可以使用 `&&` 和 `||` 进行组合，代表“且”和“或”。
 
