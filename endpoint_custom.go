@@ -16,7 +16,8 @@ func init() {
 	flags.StringVar(&endpoint, "endpoint", "https://api.moonshot.cn", "API endpoint")
 	cobra.OnInitialize(func() {
 		if !flags.Changed("endpoint") && MoonConfig.Endpoint != "" {
-			endpoint = strings.TrimSuffix(MoonConfig.Endpoint, "/")
+			endpoint = MoonConfig.Endpoint
 		}
+		endpoint = strings.TrimSuffix(endpoint, "/")
 	})
 }

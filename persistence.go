@@ -51,6 +51,9 @@ func init() {
 	if err = addLatencyField(tableInfos); err != nil {
 		logFatal(err)
 	}
+	if err = addEndpointField(tableInfos); err != nil {
+		logFatal(err)
+	}
 }
 
 func addTTFTField(tableInfos []*tableInfo) error {
@@ -69,6 +72,15 @@ func addLatencyField(tableInfos []*tableInfo) error {
 		}
 	}
 	return persistence.addLatencyField()
+}
+
+func addEndpointField(tableInfos []*tableInfo) error {
+	for _, info := range tableInfos {
+		if info.Name == "endpoint" {
+			return nil
+		}
+	}
+	return persistence.addEndpointField()
 }
 
 type tableInfo struct {
@@ -98,6 +110,7 @@ func tableFields(exclude ...string) (fields string) {
 	return strings.Join(fieldList, ",")
 }
 
+//go:generate python3 updateln.py
 //go:generate defc generate --features sqlx/nort --func fields=tableFields
 type Persistence interface {
 	// createTable exec const
@@ -125,7 +138,8 @@ type Persistence interface {
 		    response_body          text,
 		    error                  text,
 		    response_ttft          integer,
-		    latency 			   integer,
+		    latency                integer,
+		    endpoint               text,
 		    created_at             text default (datetime('now', 'localtime')) not null
 		);
 	*/
@@ -142,6 +156,10 @@ type Persistence interface {
 	// addLatencyField exec
 	// alter table moonshot_requests add latency integer;
 	addLatencyField() error
+
+	// addEndpointField exec
+	// alter table moonshot_requests add endpoint text;
+	addEndpointField() error
 
 	// Cleanup exec named const
 	// delete from moonshot_requests where created_at < :before;
@@ -170,6 +188,7 @@ type Persistence interface {
 		    {{ if .programError }},error{{ end }}
 		    {{ if .responseTTFT }},response_ttft{{ end }}
 		    {{ if .latency }},latency{{ end }}
+		    {{ if .endpoint }},endpoint{{ end }}
 		) values (
 		    :requestMethod,
 		    :requestPath,
@@ -191,6 +210,7 @@ type Persistence interface {
 		    {{ if .programError }},:programError{{ end }}
 		    {{ if .responseTTFT }},:responseTTFT{{ end }}
 		    {{ if .latency }},:latency{{ end }}
+		    {{ if .endpoint }},:endpoint{{ end }}
 		);
 	*/
 	// select last_insert_rowid();
@@ -215,6 +235,7 @@ type Persistence interface {
 		responseTTFT int,
 		createdAt string,
 		latency time.Duration,
+		endpoint string,
 	) (pid int64, err error)
 
 	// ListRequests query many bind
@@ -290,6 +311,7 @@ type Request struct {
 	Error                sql.NullString `db:"error"`
 	CreatedAt            SqliteTime     `db:"created_at"`
 	Latency              sql.NullInt64  `db:"latency"`
+	Endpoint             sql.NullString `db:"endpoint"`
 
 	// Extra Fields
 
@@ -360,7 +382,13 @@ func (r *Request) ChatCmpl() string {
 }
 
 func (r *Request) Url() (url string) {
-	url = endpoint + r.RequestPath
+	var requestEndpoint string
+	if r.Endpoint.Valid {
+		requestEndpoint = r.Endpoint.String
+	} else {
+		requestEndpoint = endpoint
+	}
+	url = requestEndpoint + r.RequestPath
 	if r.RequestQuery != "" {
 		url += "?" + r.RequestQuery
 	}

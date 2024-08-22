@@ -237,6 +237,7 @@ func buildProxy(
 					responseTTFT,
 					createdAt.Format(time.DateTime),
 					latency,
+					endpoint,
 				)
 				if err != nil {
 					logFatal(err)
