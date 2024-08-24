@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -62,6 +63,8 @@ func logRequest(
 	tokenFinishLatency time.Duration,
 	err error,
 	warnings []error,
+	requestHeader http.Header,
+	responseHeader http.Header,
 ) {
 	if query != "" {
 		path += "?" + query
@@ -79,29 +82,38 @@ func logRequest(
 	)
 	if requestContentType != "" {
 		logger.Printf("  - Request Headers: \n")
-		logger.Printf("    - Content-Type:   %s\n", requestContentType)
+		logger.Printf("    - Content-Type:    %s\n", requestContentType)
+		if acceptEncoding := filterHeaderFlags(requestHeader.Get("Accept-Encoding")); acceptEncoding != "" {
+			logger.Printf("    - Accept-Encoding: %s\n", acceptEncoding)
+		}
 		if requestID != "" {
-			logger.Printf("    - X-Request-Id:   %s\n", requestID)
+			logger.Printf("    - X-Request-Id:    %s\n", requestID)
+		}
+	}
+	if responseContentType != "" {
+		logger.Printf("  - Response Headers: \n")
+		logger.Printf("    - Content-Type:         %s\n", responseContentType)
+		if contentEncoding := filterHeaderFlags(responseHeader.Get("Content-Encoding")); contentEncoding != "" {
+			logger.Printf("    - Content-Encoding:     %s\n", contentEncoding)
 		}
 	}
 	if moonshotRequestID != "" {
-		logger.Printf("  - Response Headers: \n")
-		logger.Printf("    - Content-Type:          %s\n", responseContentType)
-		logger.Printf("    - Msh-Request-Id:        %s\n", moonshotRequestID)
-		logger.Printf("    - Server-Timing:         %ss\n", boldYellowf("%.4f", float64(moonshotServerTiming)/1000.00))
-		if moonshotContextCacheID != "" {
-			logger.Printf("    - Msh-Context-Cache-Id:  %s\n", moonshotContextCacheID)
+		logger.Printf("    - Msh-Request-Id:       %s\n", moonshotRequestID)
+		logger.Printf("    - Server-Timing:        %s s\n", boldYellowf("%.4f", float64(moonshotServerTiming)/1000.00))
+		if moonshotContextCacheID == "" {
+			moonshotContextCacheID = "<no-cache>"
 		}
+		logger.Printf("    - Msh-Context-Cache-Id: %s\n", moonshotContextCacheID)
 		if moonshotUID != "" {
-			logger.Printf("    - Msh-Uid:               %s\n", moonshotUID)
-			logger.Printf("    - Msh-Gid:               %s\n", moonshotGID)
+			logger.Printf("    - Msh-Uid:              %s\n", moonshotUID)
+			logger.Printf("    - Msh-Gid:              %s\n", moonshotGID)
 		}
 	}
 	if moonshot != nil && moonshot.ID != "" {
 		logger.Printf("  - Response: \n")
 		logger.Printf("    - id:                %s\n", moonshot.ID)
 		if responseTTFT > 0 {
-			logger.Printf("    - ttft:              %ss\n", boldYellowf("%.4f", float64(responseTTFT)/1000.00))
+			logger.Printf("    - ttft:              %s s\n", boldYellowf("%.4f", float64(responseTTFT)/1000.00))
 		}
 		if usage := moonshot.Usage; usage != nil {
 			if tokenFinishLatency > 0 {
@@ -109,8 +121,8 @@ func logRequest(
 					float64(responseTTFT)*float64(time.Millisecond)) /
 					float64(time.Second)) /
 					float64(usage.CompletionTokens-_boolToInt(responseTTFT != 0))
-				logger.Printf("    - tpot:              %ss/token\n", boldYellowf("%.4f", timePerOutputToken))
-				logger.Printf("    - otps:              %stokens/s\n", boldYellowf("%.4f", 1/timePerOutputToken))
+				logger.Printf("    - tpot:              %s s/token\n", boldYellowf("%.4f", timePerOutputToken))
+				logger.Printf("    - otps:              %s tokens/s\n", boldYellowf("%.4f", 1/timePerOutputToken))
 			}
 			logger.Printf("    - prompt_tokens:     %d\n", usage.PromptTokens)
 			logger.Printf("    - completion_tokens: %d\n", usage.CompletionTokens)
@@ -118,6 +130,10 @@ func logRequest(
 			if usage.CachedTokens > 0 {
 				logger.Printf("    - cached_tokens:     %d\n", usage.CachedTokens)
 			}
+		} else {
+			logger.Printf("    - prompt_tokens:     %s\n", "unknown")
+			logger.Printf("    - completion_tokens: %s\n", "unknown")
+			logger.Printf("    - total_tokens:      %s\n", "unknown")
 		}
 	}
 	if err != nil {

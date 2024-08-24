@@ -197,6 +197,33 @@ func buildProxy(
 				if latency == 0 {
 					latency = time.Since(createdAt)
 				}
+				var (
+					responseTPOT int
+					responseOTPS float64
+				)
+				if moonshot != nil {
+					if usage := moonshot.Usage; usage != nil {
+						timePerOutputToken := (float64(tokenFinishLatency) -
+							float64(responseTTFT)*float64(time.Millisecond)) /
+							float64(usage.CompletionTokens-_boolToInt(responseTTFT != 0))
+						responseTPOT = int(timePerOutputToken / float64(time.Millisecond))
+						responseOTPS = 1 / (timePerOutputToken / float64(time.Second))
+					}
+				}
+				var (
+					requestHeader  http.Header
+					responseHeader http.Header
+				)
+				if newRequest != nil {
+					requestHeader = newRequest.Header
+				} else {
+					requestHeader = r.Header
+				}
+				if newResponse != nil {
+					responseHeader = newResponse.Header
+				} else {
+					responseHeader = make(http.Header)
+				}
 				logRequest(
 					requestMethod,
 					requestPath,
@@ -216,6 +243,8 @@ func buildProxy(
 					tokenFinishLatency,
 					err,
 					warnings,
+					requestHeader,
+					responseHeader,
 				)
 				var lastInsertID int64
 				lastInsertID, err = persistence.Persistence(
@@ -237,6 +266,8 @@ func buildProxy(
 					string(responseBody),
 					toErrMsg(err),
 					responseTTFT,
+					responseTPOT,
+					responseOTPS,
 					createdAt.Format(time.DateTime),
 					latency,
 					endpoint,
@@ -249,7 +280,13 @@ func buildProxy(
 		}()
 		requestBody, err = io.ReadAll(r.Body)
 		if err != nil {
-			writeProxyError(encoder, "read_request_body", err)
+			writeProxyError(
+				encoder,
+				w.Header(),
+				w.WriteHeader,
+				stepReadRequestBody,
+				err,
+			)
 			return
 		}
 		if forceStream {
@@ -269,7 +306,13 @@ func buildProxy(
 			bytes.NewReader(requestBody),
 		)
 		if err != nil {
-			writeProxyError(encoder, "make_new_request", err)
+			writeProxyError(
+				encoder,
+				w.Header(),
+				w.WriteHeader,
+				stepMakeNewRequest,
+				err,
+			)
 			return
 		}
 		if encodings := r.Header.Values("Accept-Encoding"); encodings != nil {
@@ -300,7 +343,13 @@ func buildProxy(
 		createdAt = time.Now()
 		newResponse, err = httpClient.Do(newRequest)
 		if err != nil {
-			writeProxyError(encoder, "send_new_request", err)
+			writeProxyError(
+				encoder,
+				w.Header(),
+				w.WriteHeader,
+				stepSendNewRequest,
+				err,
+			)
 			return
 		}
 		defer newResponse.Body.Close()
@@ -463,7 +512,13 @@ func buildProxy(
 		} else {
 			responseBody, err = io.ReadAll(newResponse.Body)
 			if err != nil {
-				writeProxyError(encoder, "read_response_body", err)
+				writeProxyError(
+					encoder,
+					w.Header(),
+					w.WriteHeader,
+					stepReadResponseBody,
+					err,
+				)
 				return
 			}
 			tokenFinishLatency = time.Since(createdAt)
@@ -633,7 +688,22 @@ func formatHeader[R *http.Request | *http.Response](r R) string {
 
 type object map[string]any
 
-func writeProxyError(encoder *json.Encoder, typ string, err error) {
+const (
+	stepReadRequestBody  = "read_request_body"
+	stepMakeNewRequest   = "make_new_request"
+	stepSendNewRequest   = "send_new_request"
+	stepReadResponseBody = "read_response_body"
+)
+
+func writeProxyError(
+	encoder *json.Encoder,
+	header http.Header,
+	status func(int),
+	typ string,
+	err error,
+) {
+	header.Set("Content-Type", "application/json; charset=utf-8")
+	status(http.StatusInternalServerError)
 	encoder.Encode(object{
 		"error": object{
 			"code":    "proxy_server_error",

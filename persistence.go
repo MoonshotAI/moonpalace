@@ -45,15 +45,19 @@ func init() {
 	if err != nil {
 		logFatal(err)
 	}
-	if err = addTTFTField(tableInfos); err != nil {
-		logFatal(err)
+	for _, alter := range alterFuncs {
+		if err = alter(tableInfos); err != nil {
+			logFatal(err)
+		}
 	}
-	if err = addLatencyField(tableInfos); err != nil {
-		logFatal(err)
-	}
-	if err = addEndpointField(tableInfos); err != nil {
-		logFatal(err)
-	}
+}
+
+var alterFuncs = []func([]*tableInfo) error{
+	addTTFTField,
+	addTPOTField,
+	addOTPSField,
+	addLatencyField,
+	addEndpointField,
 }
 
 func addTTFTField(tableInfos []*tableInfo) error {
@@ -63,6 +67,24 @@ func addTTFTField(tableInfos []*tableInfo) error {
 		}
 	}
 	return persistence.addTTFTField()
+}
+
+func addTPOTField(tableInfos []*tableInfo) error {
+	for _, info := range tableInfos {
+		if info.Name == "response_tpot" {
+			return nil
+		}
+	}
+	return persistence.addTPOTField()
+}
+
+func addOTPSField(tableInfos []*tableInfo) error {
+	for _, info := range tableInfos {
+		if info.Name == "response_otps" {
+			return nil
+		}
+	}
+	return persistence.addOTPSField()
 }
 
 func addLatencyField(tableInfos []*tableInfo) error {
@@ -138,6 +160,8 @@ type Persistence interface {
 		    response_body          text,
 		    error                  text,
 		    response_ttft          integer,
+		    response_tpot          integer,
+		    response_otps          real,
 		    latency                integer,
 		    endpoint               text,
 		    created_at             text default (datetime('now', 'localtime')) not null
@@ -152,6 +176,14 @@ type Persistence interface {
 	// addTTFTField exec
 	// alter table moonshot_requests add response_ttft integer;
 	addTTFTField() error
+
+	// addTPOTField exec
+	// alter table moonshot_requests add response_tpot integer;
+	addTPOTField() error
+
+	// addOTPSField exec
+	// alter table moonshot_requests add response_otps real;
+	addOTPSField() error
 
 	// addLatencyField exec
 	// alter table moonshot_requests add latency integer;
@@ -187,6 +219,8 @@ type Persistence interface {
 		    {{ if .responseBody }},response_body{{ end }}
 		    {{ if .programError }},error{{ end }}
 		    {{ if .responseTTFT }},response_ttft{{ end }}
+		    {{ if .responseTPOT }},response_tpot{{ end }}
+		    {{ if .responseOTPS }},response_otps{{ end }}
 		    {{ if .latency }},latency{{ end }}
 		    {{ if .endpoint }},endpoint{{ end }}
 		) values (
@@ -209,6 +243,8 @@ type Persistence interface {
 		    {{ if .responseBody }},:responseBody{{ end }}
 		    {{ if .programError }},:programError{{ end }}
 		    {{ if .responseTTFT }},:responseTTFT{{ end }}
+		    {{ if .responseTPOT }},:responseTPOT{{ end }}
+		    {{ if .responseOTPS }},:responseOTPS{{ end }}
 		    {{ if .latency }},:latency{{ end }}
 		    {{ if .endpoint }},:endpoint{{ end }}
 		);
@@ -233,6 +269,8 @@ type Persistence interface {
 		responseBody string,
 		programError string,
 		responseTTFT int,
+		responseTPOT int,
+		responseOTPS float64,
 		createdAt string,
 		latency time.Duration,
 		endpoint string,
@@ -290,28 +328,30 @@ type Persistence interface {
 }
 
 type Request struct {
-	ID                   int64          `db:"id"`
-	RequestMethod        string         `db:"request_method"`
-	RequestPath          string         `db:"request_path"`
-	RequestQuery         string         `db:"request_query"`
-	RequestContentType   sql.NullString `db:"request_content_type"`
-	RequestID            sql.NullString `db:"request_id"`
-	MoonshotID           sql.NullString `db:"moonshot_id"`
-	MoonshotGID          sql.NullString `db:"moonshot_gid"`
-	MoonshotUID          sql.NullString `db:"moonshot_uid"`
-	MoonshotRequestID    sql.NullString `db:"moonshot_request_id"`
-	MoonshotServerTiming sql.NullInt64  `db:"moonshot_server_timing"`
-	ResponseStatusCode   sql.NullInt64  `db:"response_status_code"`
-	ResponseContentType  sql.NullString `db:"response_content_type"`
-	RequestHeader        sql.NullString `db:"request_header"`
-	RequestBody          sql.NullString `db:"request_body"`
-	ResponseHeader       sql.NullString `db:"response_header"`
-	ResponseBody         sql.NullString `db:"response_body"`
-	ResponseTTFT         sql.NullInt64  `db:"response_ttft"`
-	Error                sql.NullString `db:"error"`
-	CreatedAt            SqliteTime     `db:"created_at"`
-	Latency              sql.NullInt64  `db:"latency"`
-	Endpoint             sql.NullString `db:"endpoint"`
+	ID                   int64           `db:"id"`
+	RequestMethod        string          `db:"request_method"`
+	RequestPath          string          `db:"request_path"`
+	RequestQuery         string          `db:"request_query"`
+	RequestContentType   sql.NullString  `db:"request_content_type"`
+	RequestID            sql.NullString  `db:"request_id"`
+	MoonshotID           sql.NullString  `db:"moonshot_id"`
+	MoonshotGID          sql.NullString  `db:"moonshot_gid"`
+	MoonshotUID          sql.NullString  `db:"moonshot_uid"`
+	MoonshotRequestID    sql.NullString  `db:"moonshot_request_id"`
+	MoonshotServerTiming sql.NullInt64   `db:"moonshot_server_timing"`
+	ResponseStatusCode   sql.NullInt64   `db:"response_status_code"`
+	ResponseContentType  sql.NullString  `db:"response_content_type"`
+	RequestHeader        sql.NullString  `db:"request_header"`
+	RequestBody          sql.NullString  `db:"request_body"`
+	ResponseHeader       sql.NullString  `db:"response_header"`
+	ResponseBody         sql.NullString  `db:"response_body"`
+	ResponseTTFT         sql.NullInt64   `db:"response_ttft"`
+	ResponseTPOT         sql.NullInt64   `db:"response_tpot"`
+	ResponseOTPS         sql.NullFloat64 `db:"response_otps"`
+	Error                sql.NullString  `db:"error"`
+	CreatedAt            SqliteTime      `db:"created_at"`
+	Latency              sql.NullInt64   `db:"latency"`
+	Endpoint             sql.NullString  `db:"endpoint"`
 
 	// Extra Fields
 
@@ -432,9 +472,18 @@ func (r *Request) Metadata() (metadata map[string]string) {
 	if r.ResponseTTFT.Valid {
 		metadata["response_ttft"] = strconv.FormatInt(r.ResponseTTFT.Int64, 10)
 	}
+	if r.ResponseTPOT.Valid {
+		metadata["response_tpot"] = strconv.FormatInt(r.ResponseTPOT.Int64, 10)
+	}
+	if r.ResponseOTPS.Valid {
+		metadata["response_otps"] = strconv.FormatFloat(r.ResponseOTPS.Float64, 'f', 4, 64)
+	}
 	metadata["requested_at"] = r.CreatedAt.Format(time.DateTime)
 	if r.Latency.Valid {
 		metadata["latency"] = strconv.FormatInt(r.Latency.Int64/int64(time.Millisecond), 10)
+	}
+	if r.Endpoint.Valid {
+		metadata["endpoint"] = r.Endpoint.String
 	}
 	return metadata
 }

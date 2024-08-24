@@ -68,6 +68,7 @@ func TestParse(t *testing.T) {
 			"3.14.role == 'user'",
 			"response_content_type == 'application/json' & response_status_code == 200",
 			"response_content_type == 'application/json' | response_status_code == 200",
+			"response_header ~ 'pytest''",
 		}
 		for i, predicate := range predicates {
 			t.Run(strconv.Itoa(i+1), func(t *testing.T) {
