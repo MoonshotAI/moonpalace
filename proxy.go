@@ -206,8 +206,10 @@ func buildProxy(
 						timePerOutputToken := (float64(tokenFinishLatency) -
 							float64(responseTTFT)*float64(time.Millisecond)) /
 							float64(usage.CompletionTokens-_boolToInt(responseTTFT != 0))
-						responseTPOT = int(timePerOutputToken / float64(time.Millisecond))
-						responseOTPS = 1 / (timePerOutputToken / float64(time.Second))
+						if timePerOutputToken > 0 {
+							responseTPOT = int(timePerOutputToken / float64(time.Millisecond))
+							responseOTPS = 1 / (timePerOutputToken / float64(time.Second))
+						}
 					}
 				}
 				var (
