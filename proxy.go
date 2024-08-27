@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os/signal"
 	"strconv"
@@ -206,7 +207,7 @@ func buildProxy(
 						timePerOutputToken := (float64(tokenFinishLatency) -
 							float64(responseTTFT)*float64(time.Millisecond)) /
 							float64(usage.CompletionTokens-_boolToInt(responseTTFT != 0))
-						if timePerOutputToken > 0 {
+						if timePerOutputToken > 0.0 && timePerOutputToken < math.Inf(1) {
 							responseTPOT = int(timePerOutputToken / float64(time.Millisecond))
 							responseOTPS = 1 / (timePerOutputToken / float64(time.Second))
 						}
