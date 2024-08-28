@@ -292,7 +292,7 @@ func buildProxy(
 			)
 			return
 		}
-		if forceStream {
+		if strings.HasSuffix(requestPath, "/chat/completions") && forceStream {
 			var streamRequest MoonshotStreamRequest
 			json.Unmarshal(requestBody, &streamRequest)
 			if streamRequest.Stream != nil {
@@ -538,7 +538,7 @@ func buildProxy(
 					return
 				}
 			}
-			if requestPath == "/v1/chat/completions" && responseContentType == "application/json" {
+			if strings.HasSuffix(requestPath, "/chat/completions") && responseContentType == "application/json" {
 				var completion MoonshotCompletion
 				if err = json.Unmarshal(responseBody, &completion); err == nil && completion.ID != "" {
 					if moonshot == nil {
