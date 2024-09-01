@@ -3,20 +3,15 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
-	"database/sql/driver"
-	"errors"
 	"fmt"
-	"reflect"
 	"strconv"
-	"strings"
-	"sync"
 	"text/template"
 	"time"
 
-	"github.com/jmoiron/sqlx"
+	__rt "github.com/x5iu/defc/runtime"
+	"github.com/x5iu/defc/sqlx"
 )
 
 func NewPersistence(drv string, dsn string) Persistence {
@@ -68,7 +63,7 @@ func (__imp *implPersistence) Close() error {
 var (
 	_ = (*template.Template)(nil)
 
-	__PersistenceBaseTemplate = template.Must(template.New("PersistenceBaseTemplate").Funcs(template.FuncMap{"bindvars": __PersistenceBindVars, "fields": tableFields}).Parse(""))
+	__PersistenceBaseTemplate = template.Must(template.New("PersistenceBaseTemplate").Funcs(template.FuncMap{"bindvars": __rt.BindVars, "fields": tableFields}).Parse(""))
 
 	sqlTmpladdTTFTField     = template.Must(__PersistenceBaseTemplate.New("addTTFTField").Parse("alter table moonshot_requests add response_ttft integer;\r\n"))
 	sqlTmpladdTPOTField     = template.Must(__PersistenceBaseTemplate.New("addTPOTField").Parse("alter table moonshot_requests add response_tpot integer;\r\n"))
@@ -82,12 +77,12 @@ var (
 func (__imp *implPersistence) createTable() error {
 	var (
 		errcreateTable     error
-		argListcreateTable = make(__PersistenceArguments, 0, 8)
+		argListcreateTable = make(__rt.Arguments, 0, 8)
 	)
 
-	argListcreateTable = __PersistenceArguments{}
+	argListcreateTable = __rt.Arguments{}
 
-	querycreateTable := "create table if not exists moonshot_requests ( id                     integer not null constraint moonshot_requests_pk primary key autoincrement, request_method         text    not null, request_path           text    not null, request_query          text    not null, request_content_type   text, request_id             text, moonshot_id            text, moonshot_gid           text, moonshot_uid           text, moonshot_request_id    text, moonshot_server_timing integer, response_status_code   integer, response_content_type  text, request_header         text, request_body           text, response_header        text, response_body          text, error                  text, response_ttft          integer, response_tpot          integer, response_otps          real, latency                integer, endpoint               text, created_at             text default (datetime('now', 'localtime')) not null );\r\n"
+	querycreateTable := "create table if not exists moonshot_requests ( id                     integer not null constraint moonshot_requests_pk primary key autoincrement, request_method         text    not null, request_path           text    not null, request_query          text    not null, request_content_type   text, request_id             text, moonshot_id            text, moonshot_gid           text, moonshot_uid           text, moonshot_request_id    text, moonshot_server_timing integer, response_status_code   integer, response_content_type  text, request_header         text, request_body           text, response_header        text, response_body          text, error                  text, response_ttft          integer, response_tpot          integer, response_otps          real, latency                integer, endpoint               text, created_at             text    default (datetime('now', 'localtime')) not null ); create table if not exists moonshot_caches ( id                     integer not null constraint moonshot_requests_pk primary key autoincrement, cache_id               text    not null, hash                   text    not null, n_bytes                integer not null, k_ident                text    not null, created_at             text    default (datetime('now', 'localtime')) not null, updated_at             text )\r\n"
 
 	txcreateTable, errcreateTable := __imp.__core.Beginx()
 	if errcreateTable != nil {
@@ -98,13 +93,13 @@ func (__imp *implPersistence) createTable() error {
 	}
 
 	offsetcreateTable := 0
-	argscreateTable := __PersistenceMergeArgs(argListcreateTable...)
+	argscreateTable := __rt.MergeArgs(argListcreateTable...)
 
-	sqlSlicecreateTable := __PersistenceSplit(querycreateTable, ";")
+	sqlSlicecreateTable := __rt.Split(querycreateTable, ";")
 	for indexcreateTable, splitSqlcreateTable := range sqlSlicecreateTable {
 		_ = indexcreateTable
 
-		countcreateTable := __PersistenceCount(splitSqlcreateTable, "?")
+		countcreateTable := __rt.Count(splitSqlcreateTable, "?")
 
 		_, errcreateTable = txcreateTable.Exec(splitSqlcreateTable, argscreateTable[offsetcreateTable:offsetcreateTable+countcreateTable]...)
 
@@ -128,10 +123,10 @@ func (__imp *implPersistence) inspectTable() ([]*tableInfo, error) {
 	var (
 		v0inspectTable      []*tableInfo
 		errinspectTable     error
-		argListinspectTable = make(__PersistenceArguments, 0, 8)
+		argListinspectTable = make(__rt.Arguments, 0, 8)
 	)
 
-	argListinspectTable = __PersistenceArguments{}
+	argListinspectTable = __rt.Arguments{}
 
 	queryinspectTable := "pragma table_info(moonshot_requests);\r\n"
 
@@ -144,13 +139,13 @@ func (__imp *implPersistence) inspectTable() ([]*tableInfo, error) {
 	}
 
 	offsetinspectTable := 0
-	argsinspectTable := __PersistenceMergeArgs(argListinspectTable...)
+	argsinspectTable := __rt.MergeArgs(argListinspectTable...)
 
-	sqlSliceinspectTable := __PersistenceSplit(queryinspectTable, ";")
+	sqlSliceinspectTable := __rt.Split(queryinspectTable, ";")
 	for indexinspectTable, splitSqlinspectTable := range sqlSliceinspectTable {
 		_ = indexinspectTable
 
-		countinspectTable := __PersistenceCount(splitSqlinspectTable, "?")
+		countinspectTable := __rt.Count(splitSqlinspectTable, "?")
 
 		if indexinspectTable < len(sqlSliceinspectTable)-1 {
 			_, errinspectTable = txinspectTable.Exec(splitSqlinspectTable, argsinspectTable[offsetinspectTable:offsetinspectTable+countinspectTable]...)
@@ -177,13 +172,13 @@ func (__imp *implPersistence) inspectTable() ([]*tableInfo, error) {
 func (__imp *implPersistence) addTTFTField() error {
 	var (
 		erraddTTFTField     error
-		argListaddTTFTField = make(__PersistenceArguments, 0, 8)
+		argListaddTTFTField = make(__rt.Arguments, 0, 8)
 	)
 
-	argListaddTTFTField = __PersistenceArguments{}
+	argListaddTTFTField = __rt.Arguments{}
 
-	sqladdTTFTField := __PersistenceGetBuffer()
-	defer __PersistencePutBuffer(sqladdTTFTField)
+	sqladdTTFTField := __rt.GetBuffer()
+	defer __rt.PutBuffer(sqladdTTFTField)
 	defer sqladdTTFTField.Reset()
 
 	if erraddTTFTField = sqlTmpladdTTFTField.Execute(sqladdTTFTField, map[string]any{}); erraddTTFTField != nil {
@@ -201,13 +196,13 @@ func (__imp *implPersistence) addTTFTField() error {
 	}
 
 	offsetaddTTFTField := 0
-	argsaddTTFTField := __PersistenceMergeArgs(argListaddTTFTField...)
+	argsaddTTFTField := __rt.MergeArgs(argListaddTTFTField...)
 
-	sqlSliceaddTTFTField := __PersistenceSplit(queryaddTTFTField, ";")
+	sqlSliceaddTTFTField := __rt.Split(queryaddTTFTField, ";")
 	for indexaddTTFTField, splitSqladdTTFTField := range sqlSliceaddTTFTField {
 		_ = indexaddTTFTField
 
-		countaddTTFTField := __PersistenceCount(splitSqladdTTFTField, "?")
+		countaddTTFTField := __rt.Count(splitSqladdTTFTField, "?")
 
 		_, erraddTTFTField = txaddTTFTField.Exec(splitSqladdTTFTField, argsaddTTFTField[offsetaddTTFTField:offsetaddTTFTField+countaddTTFTField]...)
 
@@ -230,13 +225,13 @@ func (__imp *implPersistence) addTTFTField() error {
 func (__imp *implPersistence) addTPOTField() error {
 	var (
 		erraddTPOTField     error
-		argListaddTPOTField = make(__PersistenceArguments, 0, 8)
+		argListaddTPOTField = make(__rt.Arguments, 0, 8)
 	)
 
-	argListaddTPOTField = __PersistenceArguments{}
+	argListaddTPOTField = __rt.Arguments{}
 
-	sqladdTPOTField := __PersistenceGetBuffer()
-	defer __PersistencePutBuffer(sqladdTPOTField)
+	sqladdTPOTField := __rt.GetBuffer()
+	defer __rt.PutBuffer(sqladdTPOTField)
 	defer sqladdTPOTField.Reset()
 
 	if erraddTPOTField = sqlTmpladdTPOTField.Execute(sqladdTPOTField, map[string]any{}); erraddTPOTField != nil {
@@ -254,13 +249,13 @@ func (__imp *implPersistence) addTPOTField() error {
 	}
 
 	offsetaddTPOTField := 0
-	argsaddTPOTField := __PersistenceMergeArgs(argListaddTPOTField...)
+	argsaddTPOTField := __rt.MergeArgs(argListaddTPOTField...)
 
-	sqlSliceaddTPOTField := __PersistenceSplit(queryaddTPOTField, ";")
+	sqlSliceaddTPOTField := __rt.Split(queryaddTPOTField, ";")
 	for indexaddTPOTField, splitSqladdTPOTField := range sqlSliceaddTPOTField {
 		_ = indexaddTPOTField
 
-		countaddTPOTField := __PersistenceCount(splitSqladdTPOTField, "?")
+		countaddTPOTField := __rt.Count(splitSqladdTPOTField, "?")
 
 		_, erraddTPOTField = txaddTPOTField.Exec(splitSqladdTPOTField, argsaddTPOTField[offsetaddTPOTField:offsetaddTPOTField+countaddTPOTField]...)
 
@@ -283,13 +278,13 @@ func (__imp *implPersistence) addTPOTField() error {
 func (__imp *implPersistence) addOTPSField() error {
 	var (
 		erraddOTPSField     error
-		argListaddOTPSField = make(__PersistenceArguments, 0, 8)
+		argListaddOTPSField = make(__rt.Arguments, 0, 8)
 	)
 
-	argListaddOTPSField = __PersistenceArguments{}
+	argListaddOTPSField = __rt.Arguments{}
 
-	sqladdOTPSField := __PersistenceGetBuffer()
-	defer __PersistencePutBuffer(sqladdOTPSField)
+	sqladdOTPSField := __rt.GetBuffer()
+	defer __rt.PutBuffer(sqladdOTPSField)
 	defer sqladdOTPSField.Reset()
 
 	if erraddOTPSField = sqlTmpladdOTPSField.Execute(sqladdOTPSField, map[string]any{}); erraddOTPSField != nil {
@@ -307,13 +302,13 @@ func (__imp *implPersistence) addOTPSField() error {
 	}
 
 	offsetaddOTPSField := 0
-	argsaddOTPSField := __PersistenceMergeArgs(argListaddOTPSField...)
+	argsaddOTPSField := __rt.MergeArgs(argListaddOTPSField...)
 
-	sqlSliceaddOTPSField := __PersistenceSplit(queryaddOTPSField, ";")
+	sqlSliceaddOTPSField := __rt.Split(queryaddOTPSField, ";")
 	for indexaddOTPSField, splitSqladdOTPSField := range sqlSliceaddOTPSField {
 		_ = indexaddOTPSField
 
-		countaddOTPSField := __PersistenceCount(splitSqladdOTPSField, "?")
+		countaddOTPSField := __rt.Count(splitSqladdOTPSField, "?")
 
 		_, erraddOTPSField = txaddOTPSField.Exec(splitSqladdOTPSField, argsaddOTPSField[offsetaddOTPSField:offsetaddOTPSField+countaddOTPSField]...)
 
@@ -336,13 +331,13 @@ func (__imp *implPersistence) addOTPSField() error {
 func (__imp *implPersistence) addLatencyField() error {
 	var (
 		erraddLatencyField     error
-		argListaddLatencyField = make(__PersistenceArguments, 0, 8)
+		argListaddLatencyField = make(__rt.Arguments, 0, 8)
 	)
 
-	argListaddLatencyField = __PersistenceArguments{}
+	argListaddLatencyField = __rt.Arguments{}
 
-	sqladdLatencyField := __PersistenceGetBuffer()
-	defer __PersistencePutBuffer(sqladdLatencyField)
+	sqladdLatencyField := __rt.GetBuffer()
+	defer __rt.PutBuffer(sqladdLatencyField)
 	defer sqladdLatencyField.Reset()
 
 	if erraddLatencyField = sqlTmpladdLatencyField.Execute(sqladdLatencyField, map[string]any{}); erraddLatencyField != nil {
@@ -360,13 +355,13 @@ func (__imp *implPersistence) addLatencyField() error {
 	}
 
 	offsetaddLatencyField := 0
-	argsaddLatencyField := __PersistenceMergeArgs(argListaddLatencyField...)
+	argsaddLatencyField := __rt.MergeArgs(argListaddLatencyField...)
 
-	sqlSliceaddLatencyField := __PersistenceSplit(queryaddLatencyField, ";")
+	sqlSliceaddLatencyField := __rt.Split(queryaddLatencyField, ";")
 	for indexaddLatencyField, splitSqladdLatencyField := range sqlSliceaddLatencyField {
 		_ = indexaddLatencyField
 
-		countaddLatencyField := __PersistenceCount(splitSqladdLatencyField, "?")
+		countaddLatencyField := __rt.Count(splitSqladdLatencyField, "?")
 
 		_, erraddLatencyField = txaddLatencyField.Exec(splitSqladdLatencyField, argsaddLatencyField[offsetaddLatencyField:offsetaddLatencyField+countaddLatencyField]...)
 
@@ -389,13 +384,13 @@ func (__imp *implPersistence) addLatencyField() error {
 func (__imp *implPersistence) addEndpointField() error {
 	var (
 		erraddEndpointField     error
-		argListaddEndpointField = make(__PersistenceArguments, 0, 8)
+		argListaddEndpointField = make(__rt.Arguments, 0, 8)
 	)
 
-	argListaddEndpointField = __PersistenceArguments{}
+	argListaddEndpointField = __rt.Arguments{}
 
-	sqladdEndpointField := __PersistenceGetBuffer()
-	defer __PersistencePutBuffer(sqladdEndpointField)
+	sqladdEndpointField := __rt.GetBuffer()
+	defer __rt.PutBuffer(sqladdEndpointField)
 	defer sqladdEndpointField.Reset()
 
 	if erraddEndpointField = sqlTmpladdEndpointField.Execute(sqladdEndpointField, map[string]any{}); erraddEndpointField != nil {
@@ -413,13 +408,13 @@ func (__imp *implPersistence) addEndpointField() error {
 	}
 
 	offsetaddEndpointField := 0
-	argsaddEndpointField := __PersistenceMergeArgs(argListaddEndpointField...)
+	argsaddEndpointField := __rt.MergeArgs(argListaddEndpointField...)
 
-	sqlSliceaddEndpointField := __PersistenceSplit(queryaddEndpointField, ";")
+	sqlSliceaddEndpointField := __rt.Split(queryaddEndpointField, ";")
 	for indexaddEndpointField, splitSqladdEndpointField := range sqlSliceaddEndpointField {
 		_ = indexaddEndpointField
 
-		countaddEndpointField := __PersistenceCount(splitSqladdEndpointField, "?")
+		countaddEndpointField := __rt.Count(splitSqladdEndpointField, "?")
 
 		_, erraddEndpointField = txaddEndpointField.Exec(splitSqladdEndpointField, argsaddEndpointField[offsetaddEndpointField:offsetaddEndpointField+countaddEndpointField]...)
 
@@ -455,11 +450,11 @@ func (__imp *implPersistence) Cleanup(before string) (sql.Result, error) {
 		defer txCleanup.Rollback()
 	}
 
-	argsCleanup := __PersistenceMergeNamedArgs(map[string]any{
+	argsCleanup := __rt.MergeNamedArgs(map[string]any{
 		"before": before,
 	})
 
-	sqlSliceCleanup := __PersistenceSplit(queryCleanup, ";")
+	sqlSliceCleanup := __rt.Split(queryCleanup, ";")
 	for indexCleanup, splitSqlCleanup := range sqlSliceCleanup {
 		_ = indexCleanup
 
@@ -497,8 +492,8 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 		errPersistence error
 	)
 
-	sqlPersistence := __PersistenceGetBuffer()
-	defer __PersistencePutBuffer(sqlPersistence)
+	sqlPersistence := __rt.GetBuffer()
+	defer __rt.PutBuffer(sqlPersistence)
 	defer sqlPersistence.Reset()
 
 	if errPersistence = sqlTmplPersistence.Execute(sqlPersistence, map[string]any{
@@ -539,7 +534,7 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 		defer txPersistence.Rollback()
 	}
 
-	argsPersistence := __PersistenceMergeNamedArgs(map[string]any{
+	argsPersistence := __rt.MergeNamedArgs(map[string]any{
 		"requestID":            requestID,
 		"requestContentType":   requestContentType,
 		"requestMethod":        requestMethod,
@@ -565,7 +560,7 @@ func (__imp *implPersistence) Persistence(requestID string, requestContentType s
 		"endpoint":             endpoint,
 	})
 
-	sqlSlicePersistence := __PersistenceSplit(queryPersistence, ";")
+	sqlSlicePersistence := __rt.Split(queryPersistence, ";")
 	for indexPersistence, splitSqlPersistence := range sqlSlicePersistence {
 		_ = indexPersistence
 
@@ -605,17 +600,17 @@ func (__imp *implPersistence) ListRequests(n int64, chatOnly bool, predicate str
 	var (
 		v0ListRequests      []*Request
 		errListRequests     error
-		argListListRequests = make(__PersistenceArguments, 0, 8)
+		argListListRequests = make(__rt.Arguments, 0, 8)
 	)
 
 	__ListRequestsBindFunc := func(arg any) string {
 		argListListRequests = append(argListListRequests, arg)
-		return __PersistenceBindVars(len(__PersistenceMergeArgs(arg)))
+		return __rt.BindVars(len(__rt.MergeArgs(arg)))
 	}
-	sqlTmplListRequests := template.Must(template.New("ListRequests").Funcs(template.FuncMap{"bind": __ListRequestsBindFunc, "bindvars": __PersistenceBindVars, "fields": tableFields}).Parse("select * from ( select {{ fields \"response_body\" }}, iif( response_content_type = 'text/event-stream' and response_body is not null, merge_cmpl(response_body), response_body ) as response_body from moonshot_requests ) where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} {{ if .predicate }} and ({{ .predicate }}) {{ end }} order by id desc {{ if .n }} limit {{ bind .n }} {{ end }} ;\r\n"))
+	sqlTmplListRequests := template.Must(template.New("ListRequests").Funcs(template.FuncMap{"bind": __ListRequestsBindFunc, "bindvars": __rt.BindVars, "fields": tableFields}).Parse("select * from ( select {{ fields \"response_body\" }}, iif( response_content_type = 'text/event-stream' and response_body is not null, merge_cmpl(response_body), response_body ) as response_body from moonshot_requests ) where 1 = 1 {{ if .chatOnly }} and request_path like '%/chat/completions' {{ end }} {{ if .predicate }} and ({{ .predicate }}) {{ end }} order by id desc {{ if .n }} limit {{ bind .n }} {{ end }} ;\r\n"))
 
-	sqlListRequests := __PersistenceGetBuffer()
-	defer __PersistencePutBuffer(sqlListRequests)
+	sqlListRequests := __rt.GetBuffer()
+	defer __rt.PutBuffer(sqlListRequests)
 	defer sqlListRequests.Reset()
 
 	if errListRequests = sqlTmplListRequests.Execute(sqlListRequests, map[string]any{
@@ -637,13 +632,13 @@ func (__imp *implPersistence) ListRequests(n int64, chatOnly bool, predicate str
 	}
 
 	offsetListRequests := 0
-	argsListRequests := __PersistenceMergeArgs(argListListRequests...)
+	argsListRequests := __rt.MergeArgs(argListListRequests...)
 
-	sqlSliceListRequests := __PersistenceSplit(queryListRequests, ";")
+	sqlSliceListRequests := __rt.Split(queryListRequests, ";")
 	for indexListRequests, splitSqlListRequests := range sqlSliceListRequests {
 		_ = indexListRequests
 
-		countListRequests := __PersistenceCount(splitSqlListRequests, "?")
+		countListRequests := __rt.Count(splitSqlListRequests, "?")
 
 		if indexListRequests < len(sqlSliceListRequests)-1 {
 			_, errListRequests = txListRequests.Exec(splitSqlListRequests, argsListRequests[offsetListRequests:offsetListRequests+countListRequests]...)
@@ -673,8 +668,8 @@ func (__imp *implPersistence) GetRequest(id int64, chatcmpl string, requestid st
 		errGetRequest error
 	)
 
-	sqlGetRequest := __PersistenceGetBuffer()
-	defer __PersistencePutBuffer(sqlGetRequest)
+	sqlGetRequest := __rt.GetBuffer()
+	defer __rt.PutBuffer(sqlGetRequest)
 	defer sqlGetRequest.Reset()
 
 	if errGetRequest = sqlTmplGetRequest.Execute(sqlGetRequest, map[string]any{
@@ -695,13 +690,13 @@ func (__imp *implPersistence) GetRequest(id int64, chatcmpl string, requestid st
 		defer txGetRequest.Rollback()
 	}
 
-	argsGetRequest := __PersistenceMergeNamedArgs(map[string]any{
+	argsGetRequest := __rt.MergeNamedArgs(map[string]any{
 		"id":        id,
 		"chatcmpl":  chatcmpl,
 		"requestid": requestid,
 	})
 
-	sqlSliceGetRequest := __PersistenceSplit(queryGetRequest, ";")
+	sqlSliceGetRequest := __rt.Split(queryGetRequest, ";")
 	for indexGetRequest, splitSqlGetRequest := range sqlSliceGetRequest {
 		_ = indexGetRequest
 
@@ -737,6 +732,228 @@ func (__imp *implPersistence) GetRequest(id int64, chatcmpl string, requestid st
 	return v0GetRequest, nil
 }
 
+func (__imp *implPersistence) SetCache(ctx context.Context, cacheID string, hash string, nBytes int, kIdent string, createdAt string) error {
+	var (
+		errSetCache error
+	)
+
+	querySetCache := "insert into moonshot_caches ( cache_id, hash, n_bytes, k_ident, created_at ) values ( :cacheID, :hash, :nBytes, :kIdent, :createdAt );\r\n"
+
+	txSetCache, errSetCache := __imp.__core.BeginTxx(ctx, nil)
+	if errSetCache != nil {
+		return fmt.Errorf("error creating %s transaction: %w", strconv.Quote("SetCache"), errSetCache)
+	}
+	if !__imp.__withTx {
+		defer txSetCache.Rollback()
+	}
+
+	argsSetCache := __rt.MergeNamedArgs(map[string]any{
+		"cacheID":   cacheID,
+		"hash":      hash,
+		"nBytes":    nBytes,
+		"kIdent":    kIdent,
+		"createdAt": createdAt,
+	})
+
+	sqlSliceSetCache := __rt.Split(querySetCache, ";")
+	for indexSetCache, splitSqlSetCache := range sqlSliceSetCache {
+		_ = indexSetCache
+
+		var listArgsSetCache []interface{}
+
+		splitSqlSetCache, listArgsSetCache, errSetCache = sqlx.Named(splitSqlSetCache, argsSetCache)
+		if errSetCache != nil {
+			return fmt.Errorf("error building %s query: %w", strconv.Quote("SetCache"), errSetCache)
+		}
+
+		splitSqlSetCache, listArgsSetCache, errSetCache = sqlx.In(splitSqlSetCache, listArgsSetCache...)
+		if errSetCache != nil {
+			return fmt.Errorf("error building %s query: %w", strconv.Quote("SetCache"), errSetCache)
+		}
+
+		_, errSetCache = txSetCache.ExecContext(ctx, splitSqlSetCache, listArgsSetCache...)
+
+		if errSetCache != nil {
+			return fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("SetCache"), splitSqlSetCache, errSetCache)
+		}
+	}
+
+	if !__imp.__withTx {
+		if errSetCache := txSetCache.Commit(); errSetCache != nil {
+			return fmt.Errorf("error committing %s transaction: %w", strconv.Quote("SetCache"), errSetCache)
+		}
+	}
+
+	return nil
+}
+
+func (__imp *implPersistence) GetCacheByHashList(ctx context.Context, hashList []string, nBytes int, kIdent string) (string, error) {
+	var (
+		v0GetCacheByHashList  string
+		errGetCacheByHashList error
+	)
+
+	queryGetCacheByHashList := "select cache_id from moonshot_caches where hash in (:hashList) and n_bytes > :nBytes and k_ident = :kIdent order by n_bytes desc limit 1;\r\n"
+
+	txGetCacheByHashList, errGetCacheByHashList := __imp.__core.BeginTxx(ctx, nil)
+	if errGetCacheByHashList != nil {
+		return v0GetCacheByHashList, fmt.Errorf("error creating %s transaction: %w", strconv.Quote("GetCacheByHashList"), errGetCacheByHashList)
+	}
+	if !__imp.__withTx {
+		defer txGetCacheByHashList.Rollback()
+	}
+
+	argsGetCacheByHashList := __rt.MergeNamedArgs(map[string]any{
+		"hashList": hashList,
+		"nBytes":   nBytes,
+		"kIdent":   kIdent,
+	})
+
+	sqlSliceGetCacheByHashList := __rt.Split(queryGetCacheByHashList, ";")
+	for indexGetCacheByHashList, splitSqlGetCacheByHashList := range sqlSliceGetCacheByHashList {
+		_ = indexGetCacheByHashList
+
+		var listArgsGetCacheByHashList []interface{}
+
+		splitSqlGetCacheByHashList, listArgsGetCacheByHashList, errGetCacheByHashList = sqlx.Named(splitSqlGetCacheByHashList, argsGetCacheByHashList)
+		if errGetCacheByHashList != nil {
+			return v0GetCacheByHashList, fmt.Errorf("error building %s query: %w", strconv.Quote("GetCacheByHashList"), errGetCacheByHashList)
+		}
+
+		splitSqlGetCacheByHashList, listArgsGetCacheByHashList, errGetCacheByHashList = sqlx.In(splitSqlGetCacheByHashList, listArgsGetCacheByHashList...)
+		if errGetCacheByHashList != nil {
+			return v0GetCacheByHashList, fmt.Errorf("error building %s query: %w", strconv.Quote("GetCacheByHashList"), errGetCacheByHashList)
+		}
+
+		if indexGetCacheByHashList < len(sqlSliceGetCacheByHashList)-1 {
+			_, errGetCacheByHashList = txGetCacheByHashList.ExecContext(ctx, splitSqlGetCacheByHashList, listArgsGetCacheByHashList...)
+		} else {
+			errGetCacheByHashList = txGetCacheByHashList.GetContext(ctx, &v0GetCacheByHashList, splitSqlGetCacheByHashList, listArgsGetCacheByHashList...)
+		}
+
+		if errGetCacheByHashList != nil {
+			return v0GetCacheByHashList, fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("GetCacheByHashList"), splitSqlGetCacheByHashList, errGetCacheByHashList)
+		}
+	}
+
+	if !__imp.__withTx {
+		if errGetCacheByHashList := txGetCacheByHashList.Commit(); errGetCacheByHashList != nil {
+			return v0GetCacheByHashList, fmt.Errorf("error committing %s transaction: %w", strconv.Quote("GetCacheByHashList"), errGetCacheByHashList)
+		}
+	}
+
+	return v0GetCacheByHashList, nil
+}
+
+func (__imp *implPersistence) UpdateCache(cacheID string, updatedAt string) error {
+	var (
+		errUpdateCache error
+	)
+
+	queryUpdateCache := "update moonshot_caches set updated_at = :updatedAt where cache_id = :cacheID;\r\n"
+
+	txUpdateCache, errUpdateCache := __imp.__core.Beginx()
+	if errUpdateCache != nil {
+		return fmt.Errorf("error creating %s transaction: %w", strconv.Quote("UpdateCache"), errUpdateCache)
+	}
+	if !__imp.__withTx {
+		defer txUpdateCache.Rollback()
+	}
+
+	argsUpdateCache := __rt.MergeNamedArgs(map[string]any{
+		"cacheID":   cacheID,
+		"updatedAt": updatedAt,
+	})
+
+	sqlSliceUpdateCache := __rt.Split(queryUpdateCache, ";")
+	for indexUpdateCache, splitSqlUpdateCache := range sqlSliceUpdateCache {
+		_ = indexUpdateCache
+
+		var listArgsUpdateCache []interface{}
+
+		splitSqlUpdateCache, listArgsUpdateCache, errUpdateCache = sqlx.Named(splitSqlUpdateCache, argsUpdateCache)
+		if errUpdateCache != nil {
+			return fmt.Errorf("error building %s query: %w", strconv.Quote("UpdateCache"), errUpdateCache)
+		}
+
+		splitSqlUpdateCache, listArgsUpdateCache, errUpdateCache = sqlx.In(splitSqlUpdateCache, listArgsUpdateCache...)
+		if errUpdateCache != nil {
+			return fmt.Errorf("error building %s query: %w", strconv.Quote("UpdateCache"), errUpdateCache)
+		}
+
+		_, errUpdateCache = txUpdateCache.Exec(splitSqlUpdateCache, listArgsUpdateCache...)
+
+		if errUpdateCache != nil {
+			return fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("UpdateCache"), splitSqlUpdateCache, errUpdateCache)
+		}
+	}
+
+	if !__imp.__withTx {
+		if errUpdateCache := txUpdateCache.Commit(); errUpdateCache != nil {
+			return fmt.Errorf("error committing %s transaction: %w", strconv.Quote("UpdateCache"), errUpdateCache)
+		}
+	}
+
+	return nil
+}
+
+func (__imp *implPersistence) RemoveInactiveCaches(kIdent string, before string) ([]string, error) {
+	var (
+		v0RemoveInactiveCaches  []string
+		errRemoveInactiveCaches error
+	)
+
+	queryRemoveInactiveCaches := "delete from moonshot_caches where k_ident = :kIdent and ( updated_at < :before or (updated_at is null and created_at < :before) );\r\n"
+
+	txRemoveInactiveCaches, errRemoveInactiveCaches := __imp.__core.Beginx()
+	if errRemoveInactiveCaches != nil {
+		return v0RemoveInactiveCaches, fmt.Errorf("error creating %s transaction: %w", strconv.Quote("RemoveInactiveCaches"), errRemoveInactiveCaches)
+	}
+	if !__imp.__withTx {
+		defer txRemoveInactiveCaches.Rollback()
+	}
+
+	argsRemoveInactiveCaches := __rt.MergeNamedArgs(map[string]any{
+		"kIdent": kIdent,
+		"before": before,
+	})
+
+	sqlSliceRemoveInactiveCaches := __rt.Split(queryRemoveInactiveCaches, ";")
+	for indexRemoveInactiveCaches, splitSqlRemoveInactiveCaches := range sqlSliceRemoveInactiveCaches {
+		_ = indexRemoveInactiveCaches
+
+		var listArgsRemoveInactiveCaches []interface{}
+
+		splitSqlRemoveInactiveCaches, listArgsRemoveInactiveCaches, errRemoveInactiveCaches = sqlx.Named(splitSqlRemoveInactiveCaches, argsRemoveInactiveCaches)
+		if errRemoveInactiveCaches != nil {
+			return v0RemoveInactiveCaches, fmt.Errorf("error building %s query: %w", strconv.Quote("RemoveInactiveCaches"), errRemoveInactiveCaches)
+		}
+
+		splitSqlRemoveInactiveCaches, listArgsRemoveInactiveCaches, errRemoveInactiveCaches = sqlx.In(splitSqlRemoveInactiveCaches, listArgsRemoveInactiveCaches...)
+		if errRemoveInactiveCaches != nil {
+			return v0RemoveInactiveCaches, fmt.Errorf("error building %s query: %w", strconv.Quote("RemoveInactiveCaches"), errRemoveInactiveCaches)
+		}
+
+		if indexRemoveInactiveCaches < len(sqlSliceRemoveInactiveCaches)-1 {
+			_, errRemoveInactiveCaches = txRemoveInactiveCaches.Exec(splitSqlRemoveInactiveCaches, listArgsRemoveInactiveCaches...)
+		} else {
+			errRemoveInactiveCaches = txRemoveInactiveCaches.Select(&v0RemoveInactiveCaches, splitSqlRemoveInactiveCaches, listArgsRemoveInactiveCaches...)
+		}
+
+		if errRemoveInactiveCaches != nil {
+			return v0RemoveInactiveCaches, fmt.Errorf("error executing %s sql: \n\n%s\n\n%w", strconv.Quote("RemoveInactiveCaches"), splitSqlRemoveInactiveCaches, errRemoveInactiveCaches)
+		}
+	}
+
+	if !__imp.__withTx {
+		if errRemoveInactiveCaches := txRemoveInactiveCaches.Commit(); errRemoveInactiveCaches != nil {
+			return v0RemoveInactiveCaches, fmt.Errorf("error committing %s transaction: %w", strconv.Quote("RemoveInactiveCaches"), errRemoveInactiveCaches)
+		}
+	}
+
+	return v0RemoveInactiveCaches, nil
+}
+
 type PersistenceCoreInterface interface {
 	Beginx() (*sqlx.Tx, error)
 	BeginTxx(ctx context.Context, opts *sql.TxOptions) (*sqlx.Tx, error)
@@ -746,250 +963,4 @@ type PersistenceCoreInterface interface {
 	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 	Select(dest interface{}, query string, args ...interface{}) error
 	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
-}
-
-var __PersistenceBufferPool = sync.Pool{
-	New: func() any {
-		return new(bytes.Buffer)
-	},
-}
-
-func __PersistenceGetBuffer() *bytes.Buffer {
-	return __PersistenceBufferPool.Get().(*bytes.Buffer)
-}
-
-func __PersistencePutBuffer(buffer *bytes.Buffer) {
-	__PersistenceBufferPool.Put(buffer)
-}
-
-type (
-	__PersistenceNotAnArg interface {
-		NotAnArg()
-	}
-
-	__PersistenceToArgs interface {
-		ToArgs() []any
-	}
-
-	__PersistenceToNamedArgs interface {
-		ToNamedArgs() map[string]any
-	}
-)
-
-var __PersistenceBytesType = reflect.TypeOf([]byte{})
-
-func __PersistenceMergeArgs(args ...any) []any {
-	dst := make([]any, 0, len(args))
-	for _, arg := range args {
-		rv := reflect.ValueOf(arg)
-		if _, notAnArg := arg.(__PersistenceNotAnArg); notAnArg {
-			continue
-		} else if toArgs, ok := arg.(__PersistenceToArgs); ok {
-			dst = append(dst, __PersistenceMergeArgs(toArgs.ToArgs()...)...)
-		} else if _, ok = arg.(driver.Valuer); ok {
-			dst = append(dst, arg)
-		} else if (rv.Kind() == reflect.Slice && !rv.Type().AssignableTo(__PersistenceBytesType)) ||
-			rv.Kind() == reflect.Array {
-			for i := 0; i < rv.Len(); i++ {
-				dst = append(dst, __PersistenceMergeArgs(rv.Index(i).Interface())...)
-			}
-		} else {
-			dst = append(dst, arg)
-		}
-	}
-	return dst
-}
-
-func __PersistenceMergeNamedArgs(argsMap map[string]any) map[string]any {
-	namedMap := make(map[string]any, len(argsMap))
-	for name, arg := range argsMap {
-		rv := reflect.ValueOf(arg)
-		if _, notAnArg := arg.(__PersistenceNotAnArg); notAnArg {
-			continue
-		} else if toNamedArgs, ok := arg.(__PersistenceToNamedArgs); ok {
-			for k, v := range toNamedArgs.ToNamedArgs() {
-				namedMap[k] = v
-			}
-		} else if _, ok = arg.(driver.Valuer); ok {
-			namedMap[name] = arg
-		} else if _, ok = arg.(__PersistenceToArgs); ok {
-			namedMap[name] = arg
-		} else if rv.Kind() == reflect.Map {
-			iter := rv.MapRange()
-			for iter.Next() {
-				k, v := iter.Key(), iter.Value()
-				if k.Kind() == reflect.String {
-					namedMap[k.String()] = v.Interface()
-				}
-			}
-		} else if rv.Kind() == reflect.Struct ||
-			(rv.Kind() == reflect.Pointer && rv.Elem().Kind() == reflect.Struct) {
-			rv = reflect.Indirect(rv)
-			rt := rv.Type()
-			for i := 0; i < rt.NumField(); i++ {
-				if sf := rt.Field(i); sf.Anonymous {
-					sft := sf.Type
-					if sft.Kind() == reflect.Pointer {
-						sft = sft.Elem()
-					}
-					for j := 0; j < sft.NumField(); j++ {
-						if tag, exists := sft.Field(j).Tag.Lookup("db"); exists {
-							for pos, char := range tag {
-								if !(('0' <= char && char <= '9') || ('a' <= char && char <= 'z') || ('A' <= char && char <= 'Z') || char == '_') {
-									tag = tag[:pos]
-									break
-								}
-							}
-							namedMap[tag] = rv.FieldByIndex([]int{i, j}).Interface()
-						}
-					}
-				} else if tag, exists := sf.Tag.Lookup("db"); exists {
-					for pos, char := range tag {
-						if !(('0' <= char && char <= '9') || ('a' <= char && char <= 'z') || ('A' <= char && char <= 'Z') || char == '_') {
-							tag = tag[:pos]
-							break
-						}
-					}
-					namedMap[tag] = rv.Field(i).Interface()
-				}
-			}
-		} else {
-			namedMap[name] = arg
-		}
-	}
-	return namedMap
-}
-
-func __PersistenceBindVars(data any) string {
-	var n int
-	switch rv := reflect.ValueOf(data); rv.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		n = int(rv.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		n = int(rv.Uint())
-	case reflect.Slice:
-		if rv.Type().AssignableTo(__PersistenceBytesType) {
-			n = 1
-		} else {
-			n = rv.Len()
-		}
-	default:
-		n = 1
-	}
-
-	bindVars := make([]string, n)
-	for i := 0; i < n; i++ {
-		bindVars[i] = "?"
-	}
-
-	return strings.Join(bindVars, ", ")
-}
-
-func __PersistenceIn[S ~[]any](query string, args S) (string, S, error) {
-	tokens := __PersistenceSplitTokens(query)
-	targetArgs := make(S, 0, len(args))
-	targetQuery := make([]string, 0, len(tokens))
-	n := 0
-	for _, token := range tokens {
-		switch token {
-		case "?":
-			if n >= len(args) {
-				return "", nil, errors.New("number of BindVars exceeds arguments")
-			}
-			nested := __PersistenceMergeArgs(args[n])
-			if len(nested) == 0 {
-				return "", nil, errors.New("empty slice passed to 'in' query")
-			}
-			targetArgs = append(targetArgs, nested...)
-			targetQuery = append(targetQuery, __PersistenceBindVars(len(nested)))
-			n++
-		default:
-			targetQuery = append(targetQuery, token)
-		}
-	}
-	if n < len(args) {
-		return "", nil, errors.New("number of bindVars less than number arguments")
-	}
-	return strings.Join(targetQuery, " "), targetArgs, nil
-}
-
-type __PersistenceArguments []any
-
-func (arguments *__PersistenceArguments) Add(argument any) string {
-	merged := __PersistenceMergeArgs(argument)
-	*arguments = append(*arguments, merged...)
-	return __PersistenceBindVars(len(merged))
-}
-
-func __PersistenceCount(sql string, ch string) (n int) {
-	tokens := __PersistenceSplitTokens(sql)
-	for _, token := range tokens {
-		if token == ch {
-			n++
-		}
-	}
-	return n
-}
-
-func __PersistenceSplit(sql string, sep string) (group []string) {
-	tokens := __PersistenceSplitTokens(sql)
-	group = make([]string, 0, len(tokens))
-	last := 0
-	for i, token := range tokens {
-		if token == sep || i+1 == len(tokens) {
-			if joint := strings.Join(tokens[last:i+1], " "); len(strings.Trim(joint, sep)) > 0 {
-				group = append(group, joint)
-			}
-			last = i + 1
-		}
-	}
-	return group
-}
-
-func __PersistenceSplitTokens(line string) (tokens []string) {
-	var (
-		singleQuoted bool
-		doubleQuoted bool
-		arg          []byte
-	)
-
-	for i := 0; i < len(line); i++ {
-		switch ch := line[i]; ch {
-		case ';', '?':
-			if doubleQuoted || singleQuoted {
-				arg = append(arg, ch)
-			} else {
-				if len(arg) > 0 {
-					tokens = append(tokens, string(arg))
-				}
-				tokens = append(tokens, string(ch))
-				arg = arg[:0]
-			}
-		case ' ', '\t', '\n', '\r':
-			if doubleQuoted || singleQuoted {
-				arg = append(arg, ch)
-			} else if len(arg) > 0 {
-				tokens = append(tokens, string(arg))
-				arg = arg[:0]
-			}
-		case '"':
-			if !(i > 0 && line[i-1] == '\\' || singleQuoted) {
-				doubleQuoted = !doubleQuoted
-			}
-			arg = append(arg, ch)
-		case '\'':
-			if !(i > 0 && line[i-1] == '\\' || doubleQuoted) {
-				singleQuoted = !singleQuoted
-			}
-			arg = append(arg, ch)
-		default:
-			arg = append(arg, ch)
-		}
-	}
-
-	if len(arg) > 0 {
-		tokens = append(tokens, string(arg))
-	}
-
-	return tokens
 }

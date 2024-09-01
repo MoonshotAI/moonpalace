@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -133,39 +134,51 @@ func tableFields(exclude ...string) (fields string) {
 }
 
 //go:generate python3 updateln.py
-//go:generate defc generate --features sqlx/nort --func fields=tableFields
+//go:generate defc generate --features sqlx/future --func fields=tableFields
 type Persistence interface {
 	// createTable exec const
 	/*
-		create table if not exists moonshot_requests
-		(
-		    id                     integer not null
-		        constraint moonshot_requests_pk
-		            primary key autoincrement,
-		    request_method         text    not null,
-		    request_path           text    not null,
-		    request_query          text    not null,
-		    request_content_type   text,
-		    request_id             text,
-		    moonshot_id            text,
-		    moonshot_gid           text,
-		    moonshot_uid           text,
-		    moonshot_request_id    text,
-		    moonshot_server_timing integer,
-		    response_status_code   integer,
-		    response_content_type  text,
-		    request_header         text,
-		    request_body           text,
-		    response_header        text,
-		    response_body          text,
-		    error                  text,
-		    response_ttft          integer,
-		    response_tpot          integer,
-		    response_otps          real,
-		    latency                integer,
-		    endpoint               text,
-		    created_at             text default (datetime('now', 'localtime')) not null
-		);
+	   create table if not exists moonshot_requests
+	   (
+	       id                     integer not null
+	           constraint moonshot_requests_pk
+	               primary key autoincrement,
+	       request_method         text    not null,
+	       request_path           text    not null,
+	       request_query          text    not null,
+	       request_content_type   text,
+	       request_id             text,
+	       moonshot_id            text,
+	       moonshot_gid           text,
+	       moonshot_uid           text,
+	       moonshot_request_id    text,
+	       moonshot_server_timing integer,
+	       response_status_code   integer,
+	       response_content_type  text,
+	       request_header         text,
+	       request_body           text,
+	       response_header        text,
+	       response_body          text,
+	       error                  text,
+	       response_ttft          integer,
+	       response_tpot          integer,
+	       response_otps          real,
+	       latency                integer,
+	       endpoint               text,
+	       created_at             text    default (datetime('now', 'localtime')) not null
+	   );
+	   create table if not exists moonshot_caches
+	   (
+	       id                     integer not null
+	               constraint moonshot_requests_pk
+	                   primary key autoincrement,
+	       cache_id               text    not null,
+	       hash                   text    not null,
+	       n_bytes                integer not null,
+	       k_ident                text    not null,
+	       created_at             text    default (datetime('now', 'localtime')) not null,
+	       updated_at             text
+	   )
 	*/
 	createTable() error
 
@@ -199,55 +212,55 @@ type Persistence interface {
 
 	// Persistence query one named
 	/*
-		insert into moonshot_requests (
-		    request_method,
-		    request_path,
-		    request_query,
-		    created_at
-		    {{ if .requestContentType }},request_content_type{{ end }}
-		    {{ if .requestID }},request_id{{ end }}
-		    {{ if .moonshotID }},moonshot_id{{ end }}
-		    {{ if .moonshotGID }},moonshot_gid{{ end }}
-		    {{ if .moonshotUID }},moonshot_uid{{ end }}
-		    {{ if .moonshotRequestID }},moonshot_request_id{{ end }}
-		    {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }}
-		    {{ if .responseStatusCode }},response_status_code{{ end }}
-		    {{ if .responseContentType }},response_content_type{{ end }}
-		    {{ if .requestHeader }},request_header{{ end }}
-		    {{ if .requestBody }},request_body{{ end }}
-		    {{ if .responseHeader }},response_header{{ end }}
-		    {{ if .responseBody }},response_body{{ end }}
-		    {{ if .programError }},error{{ end }}
-		    {{ if .responseTTFT }},response_ttft{{ end }}
-		    {{ if .responseTPOT }},response_tpot{{ end }}
-		    {{ if .responseOTPS }},response_otps{{ end }}
-		    {{ if .latency }},latency{{ end }}
-		    {{ if .endpoint }},endpoint{{ end }}
-		) values (
-		    :requestMethod,
-		    :requestPath,
-		    :requestQuery,
-		    :createdAt
-		    {{ if .requestContentType }},:requestContentType{{ end }}
-		    {{ if .requestID }},:requestID{{ end }}
-		    {{ if .moonshotID }},:moonshotID{{ end }}
-		    {{ if .moonshotGID }},:moonshotGID{{ end }}
-		    {{ if .moonshotUID }},:moonshotUID{{ end }}
-		    {{ if .moonshotRequestID }},:moonshotRequestID{{ end }}
-		    {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }}
-		    {{ if .responseStatusCode }},:responseStatusCode{{ end }}
-		    {{ if .responseContentType }},:responseContentType{{ end }}
-		    {{ if .requestHeader }},:requestHeader{{ end }}
-		    {{ if .requestBody }},:requestBody{{ end }}
-		    {{ if .responseHeader }},:responseHeader{{ end }}
-		    {{ if .responseBody }},:responseBody{{ end }}
-		    {{ if .programError }},:programError{{ end }}
-		    {{ if .responseTTFT }},:responseTTFT{{ end }}
-		    {{ if .responseTPOT }},:responseTPOT{{ end }}
-		    {{ if .responseOTPS }},:responseOTPS{{ end }}
-		    {{ if .latency }},:latency{{ end }}
-		    {{ if .endpoint }},:endpoint{{ end }}
-		);
+	   insert into moonshot_requests (
+	       request_method,
+	       request_path,
+	       request_query,
+	       created_at
+	       {{ if .requestContentType }},request_content_type{{ end }}
+	       {{ if .requestID }},request_id{{ end }}
+	       {{ if .moonshotID }},moonshot_id{{ end }}
+	       {{ if .moonshotGID }},moonshot_gid{{ end }}
+	       {{ if .moonshotUID }},moonshot_uid{{ end }}
+	       {{ if .moonshotRequestID }},moonshot_request_id{{ end }}
+	       {{ if .moonshotServerTiming }},moonshot_server_timing{{ end }}
+	       {{ if .responseStatusCode }},response_status_code{{ end }}
+	       {{ if .responseContentType }},response_content_type{{ end }}
+	       {{ if .requestHeader }},request_header{{ end }}
+	       {{ if .requestBody }},request_body{{ end }}
+	       {{ if .responseHeader }},response_header{{ end }}
+	       {{ if .responseBody }},response_body{{ end }}
+	       {{ if .programError }},error{{ end }}
+	       {{ if .responseTTFT }},response_ttft{{ end }}
+	       {{ if .responseTPOT }},response_tpot{{ end }}
+	       {{ if .responseOTPS }},response_otps{{ end }}
+	       {{ if .latency }},latency{{ end }}
+	       {{ if .endpoint }},endpoint{{ end }}
+	   ) values (
+	       :requestMethod,
+	       :requestPath,
+	       :requestQuery,
+	       :createdAt
+	       {{ if .requestContentType }},:requestContentType{{ end }}
+	       {{ if .requestID }},:requestID{{ end }}
+	       {{ if .moonshotID }},:moonshotID{{ end }}
+	       {{ if .moonshotGID }},:moonshotGID{{ end }}
+	       {{ if .moonshotUID }},:moonshotUID{{ end }}
+	       {{ if .moonshotRequestID }},:moonshotRequestID{{ end }}
+	       {{ if .moonshotServerTiming }},:moonshotServerTiming{{ end }}
+	       {{ if .responseStatusCode }},:responseStatusCode{{ end }}
+	       {{ if .responseContentType }},:responseContentType{{ end }}
+	       {{ if .requestHeader }},:requestHeader{{ end }}
+	       {{ if .requestBody }},:requestBody{{ end }}
+	       {{ if .responseHeader }},:responseHeader{{ end }}
+	       {{ if .responseBody }},:responseBody{{ end }}
+	       {{ if .programError }},:programError{{ end }}
+	       {{ if .responseTTFT }},:responseTTFT{{ end }}
+	       {{ if .responseTPOT }},:responseTPOT{{ end }}
+	       {{ if .responseOTPS }},:responseOTPS{{ end }}
+	       {{ if .latency }},:latency{{ end }}
+	       {{ if .endpoint }},:endpoint{{ end }}
+	   );
 	*/
 	// select last_insert_rowid();
 	Persistence(
@@ -278,53 +291,102 @@ type Persistence interface {
 
 	// ListRequests query many bind
 	/*
-		select *
-		from (
-			select
-				{{ fields "response_body" }},
-				iif(
-					response_content_type = 'text/event-stream' and response_body is not null,
-					merge_cmpl(response_body),
-					response_body
-				) as response_body
-			from moonshot_requests
-		)
-		where 1 = 1
-		  {{ if .chatOnly }}
-		  and request_path like '%/chat/completions'
-		  {{ end }}
-		  {{ if .predicate }}
-		  and ({{ .predicate }})
-		  {{ end }}
-		order by id desc
-		{{ if .n }}
-		limit {{ bind .n }}
-		{{ end }}
-		;
+	   select *
+	   from (
+	       select
+	           {{ fields "response_body" }},
+	           iif(
+	               response_content_type = 'text/event-stream' and response_body is not null,
+	               merge_cmpl(response_body),
+	               response_body
+	           ) as response_body
+	       from moonshot_requests
+	   )
+	   where 1 = 1
+	     {{ if .chatOnly }}
+	     and request_path like '%/chat/completions'
+	     {{ end }}
+	     {{ if .predicate }}
+	     and ({{ .predicate }})
+	     {{ end }}
+	   order by id desc
+	   {{ if .n }}
+	   limit {{ bind .n }}
+	   {{ end }}
+	   ;
 	*/
 	ListRequests(n int64, chatOnly bool, predicate string) ([]*Request, error)
 
 	// GetRequest query one named
 	/*
-		select *
-		from moonshot_requests
-		where 1 = 1
-		  {{ if .id }}
-		  and id = :id
-		  {{ end }}
-		  {{ if .chatcmpl }}
-		  and moonshot_id = :chatcmpl
-		  {{ end }}
-		  {{ if .requestid }}
-		  and moonshot_request_id = :requestid
-		  {{ end }}
-		;
+	   select *
+	   from moonshot_requests
+	   where 1 = 1
+	     {{ if .id }}
+	     and id = :id
+	     {{ end }}
+	     {{ if .chatcmpl }}
+	     and moonshot_id = :chatcmpl
+	     {{ end }}
+	     {{ if .requestid }}
+	     and moonshot_request_id = :requestid
+	     {{ end }}
+	   ;
 	*/
 	GetRequest(
 		id int64,
 		chatcmpl string,
 		requestid string,
 	) (*Request, error)
+
+	// SetCache exec named const
+	/*
+	   insert into moonshot_caches (
+	       cache_id, hash, n_bytes, k_ident, created_at
+	   ) values (
+	       :cacheID, :hash, :nBytes, :kIdent, :createdAt
+	   );
+	*/
+	SetCache(
+		ctx context.Context,
+		cacheID string,
+		hash string,
+		nBytes int,
+		kIdent string,
+		createdAt string,
+	) error
+
+	// GetCacheByHashList query one named const
+	/*
+	   select cache_id
+	   from moonshot_caches
+	   where hash in (:hashList)
+	     and n_bytes > :nBytes
+	     and k_ident = :kIdent
+	   order by n_bytes desc
+	   limit 1;
+	*/
+	GetCacheByHashList(
+		ctx context.Context,
+		hashList []string,
+		nBytes int,
+		kIdent string,
+	) (string, error)
+
+	// UpdateCache exec named const
+	// update moonshot_caches set updated_at = :updatedAt where cache_id = :cacheID;
+	UpdateCache(cacheID string, updatedAt string) error
+
+	// RemoveInactiveCaches query many named const
+	/*
+	   delete from moonshot_caches
+	   where k_ident = :kIdent
+	     and (
+	          updated_at < :before
+	      or (updated_at is null and created_at < :before)
+	   );
+	*/
+	RemoveInactiveCaches(kIdent string, before string) ([]string, error)
 }
 
 type Request struct {

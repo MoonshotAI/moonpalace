@@ -11,10 +11,6 @@ var mapPool = sync.Pool{
 	},
 }
 
-func getMap() map[rune]int32 {
-	return mapPool.Get().(map[rune]int32)
-}
-
 func putMap(x map[rune]int32) {
 	for key := range x {
 		delete(x, key)
@@ -24,7 +20,7 @@ func putMap(x map[rune]int32) {
 
 func newNode(link, maxLength int32) *node {
 	return &node{
-		Next:   getMap(),
+		Next:   mapPool.Get().(map[rune]int32),
 		Link:   link,
 		MaxLen: maxLength,
 	}

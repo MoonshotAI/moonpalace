@@ -115,15 +115,34 @@ MoonPalace 会以日志的形式将请求的细节在命令行中输出（假如
 
 ```yaml
 start:
-    port: 8080                                               # 对应 --port              命令行参数
-    key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 对应 --key               命令行参数
-    detect-repeat:                                           # 对应 --detect-repeat     命令行选项
-        threshold: 0.5                                       # 对应 --repeat-threshold  命令行参数
-        min-length: 100                                      # 对应 --repeat-min-length 命令行参数
-    force-stream: true                                       # 对应 --force-stream      命令行选项
+    port: 8080                             # 对应 --port              命令行参数
+    key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 对应 --key               命令行参数
+    detect-repeat:                         # 对应 --detect-repeat     命令行选项
+        threshold: 0.5                     # 对应 --repeat-threshold  命令行参数
+        min-length: 100                    # 对应 --repeat-min-length 命令行参数
+    force-stream: true                     # 对应 --force-stream      命令行选项
+    auto-cache:
+        min-bytes: 4096                    # 对应 --cache-min-bytes   命令行选项
+        ttl: 90                            # 对应 --cache-ttl         命令行选项
+        cleanup: 86400                     # 对应 --cache-cleanup     命令行选项
 ```
 
 **注意：当命令行参数与 `config.yaml` 配置文件参数同时出现时，会优先使用命令行参数。**
+
+#### 自动缓存功能
+
+MoonPalace 提供了自动缓存功能，你可以通过 `--auto-cache` 参数启用自动缓存功能，并搭配 `--cache-min-bytes`/`--cache-ttl`/`--cache-cleanup` 参数调节缓存的各项参数：
+
+```shell
+$ moonpalace start --port <PORT> --auto-cache --cache-min-bytes 4096 --cache-ttl 90 --cache-cleanup 86400
+```
+
+`--cache-min-bytes` 参数指定了当调用 `/chat/completions` 接口时，请求的内容大小超过 `--cache-min-bytes` 设定的值时，将会自动启用缓存：
+
+1. 若当前请求内容不匹配任何已经创建的缓存时，创建一个新的缓存，有效时间为 `--cache-ttl` 设定的值；
+2. 若当前请求内容匹配了已经创建的缓存时，使用已创建的缓存，并刷新缓存有效时间，有效时间为 `--cache-ttl` 设定的值；
+
+`--cache-cleanup` 参数指定了缓存何时被清除，若已经创建的缓存在 `--cache-cleanup` 设定的时间（秒）内没有被使用过，将会被 MoonPalace 清除。
 
 #### 内容被截断检测
 
@@ -253,7 +272,7 @@ $ moonpalace list \
 Field Operator Literal
 ```
 
-其中，`Field` 为 `sqlite` 数据库表的字段名，详细的表结构请参考 [persistence.go](https://github.com/MoonshotAI/moonpalace/blob/main/persistence.go#L138)；`Operator` 为运算符，当前支持的运算符为 `==`、`!=`、`>`、`>=`、`<`、`<=`、`~`，其中，`~` 为近似匹配符，仅适用于字符串近似匹配（等价于 `LIKE`）；`Literal` 为字面量，支持单双引号字符串、整数和浮点数数值、布尔值和 `NULL`。
+其中，`Field` 为 `sqlite` 数据库表的字段名，详细的表结构请参考 [persistence.go](https://github.com/MoonshotAI/moonpalace/blob/main/persistence.go#L139)；`Operator` 为运算符，当前支持的运算符为 `==`、`!=`、`>`、`>=`、`<`、`<=`、`~`，其中，`~` 为近似匹配符，仅适用于字符串近似匹配（等价于 `LIKE`）；`Literal` 为字面量，支持单双引号字符串、整数和浮点数数值、布尔值和 `NULL`。
 
 多个表达式之间，可以使用 `&&` 和 `||` 进行组合，代表“且”和“或”。
 

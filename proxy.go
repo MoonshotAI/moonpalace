@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"github.com/MoonshotAI/moonpalace/detector/repeat"
 	"github.com/MoonshotAI/moonpalace/merge"
 	"github.com/spf13/cobra"
+	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
 
@@ -29,12 +31,30 @@ type StartConfig struct {
 	Key          string              `yaml:"key"`
 	DetectRepeat *DetectRepeatConfig `yaml:"detect-repeat"`
 	ForceStream  bool                `yaml:"force-stream"`
+	AutoCache    *AutoCacheConfig    `yaml:"auto-cache"`
 }
 
 type DetectRepeatConfig struct {
 	Threshold float64 `yaml:"threshold"`
 	MinLength int32   `yaml:"min-length"`
 }
+
+type AutoCacheConfig struct {
+	MinBytes int `yaml:"min-bytes"`
+	TTL      int `yaml:"ttl"`
+	Cleanup  int `yaml:"cleanup"`
+}
+
+const (
+	defaultPort = 9988
+
+	defaultRepeatThreshold = 0.5
+	defaultRepeatMinLength = 100
+
+	defaultCacheMinBytes = 4 * 1024
+	defaultCacheTTL      = 60
+	defaultCacheCleanup  = 86400
+)
 
 func startCommand() *cobra.Command {
 	var cfg *StartConfig
@@ -44,12 +64,36 @@ func startCommand() *cobra.Command {
 		cfg = &StartConfig{}
 	}
 	if cfg.Port == 0 {
-		cfg.Port = 9988
+		cfg.Port = defaultPort
 	}
 	if cfg.DetectRepeat == nil {
 		cfg.DetectRepeat = &DetectRepeatConfig{
-			Threshold: 0.5,
-			MinLength: 100,
+			Threshold: defaultRepeatThreshold,
+			MinLength: defaultRepeatMinLength,
+		}
+	} else {
+		if cfg.DetectRepeat.Threshold == 0 {
+			cfg.DetectRepeat.Threshold = defaultRepeatThreshold
+		}
+		if cfg.DetectRepeat.MinLength == 0 {
+			cfg.DetectRepeat.MinLength = defaultRepeatMinLength
+		}
+	}
+	if cfg.AutoCache == nil {
+		cfg.AutoCache = &AutoCacheConfig{
+			MinBytes: defaultCacheMinBytes,
+			TTL:      defaultCacheTTL,
+			Cleanup:  defaultCacheCleanup,
+		}
+	} else {
+		if cfg.AutoCache.MinBytes == 0 {
+			cfg.AutoCache.MinBytes = defaultCacheMinBytes
+		}
+		if cfg.AutoCache.TTL == 0 {
+			cfg.AutoCache.TTL = defaultCacheTTL
+		}
+		if cfg.AutoCache.Cleanup == 0 {
+			cfg.AutoCache.Cleanup = defaultCacheCleanup
 		}
 	}
 	var (
@@ -59,6 +103,10 @@ func startCommand() *cobra.Command {
 		repeatThreshold = cfg.DetectRepeat.Threshold
 		repeatMinLength = cfg.DetectRepeat.MinLength
 		forceStream     = cfg.ForceStream
+		autoCache       = cfg.AutoCache != nil
+		cacheMinBytes   = cfg.AutoCache.MinBytes
+		cacheTTL        = cfg.AutoCache.TTL
+		cacheCleanup    = cfg.AutoCache.Cleanup
 	)
 	cmd := &cobra.Command{
 		Use:   "start",
@@ -74,6 +122,10 @@ func startCommand() *cobra.Command {
 				repeatThreshold,
 				repeatMinLength,
 				forceStream,
+				autoCache,
+				cacheMinBytes,
+				cacheTTL,
+				cacheCleanup,
 			))
 			httpServer.Addr = "127.0.0.1:" + strconv.Itoa(int(port))
 			go func() {
@@ -98,6 +150,10 @@ func startCommand() *cobra.Command {
 	flags.Float64Var(&repeatThreshold, "repeat-threshold", repeatThreshold, "repeat threshold, a float between [0, 1]")
 	flags.Int32Var(&repeatMinLength, "repeat-min-length", repeatMinLength, "repeat min length, minimum string length to detect repeat")
 	flags.BoolVar(&forceStream, "force-stream", forceStream, "force streaming for all chat completions requests")
+	flags.BoolVar(&autoCache, "auto-cache", autoCache, "enable automatic caching for requests")
+	flags.IntVar(&cacheMinBytes, "cache-min-bytes", cacheMinBytes, "minimum size of bytes to cache")
+	flags.IntVar(&cacheTTL, "cache-ttl", cacheTTL, "time to live in seconds for cached requests")
+	flags.IntVar(&cacheCleanup, "cache-cleanup", cacheCleanup, "time in seconds to cleanup expired caches")
 	return cmd
 }
 
@@ -159,6 +215,10 @@ func buildProxy(
 	repeatThreshold float64,
 	repeatMinLength int32,
 	forceStream bool,
+	autoCache bool,
+	cacheMinBytes int,
+	cacheTTL int,
+	cacheCleanup int,
 ) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var (
@@ -342,6 +402,71 @@ func buildProxy(
 			newRequest.Header.Set("Accept-Encoding", "gzip")
 		} else {
 			newRequest.Header.Del("Accept-Encoding")
+		}
+		if strings.HasSuffix(requestPath, "/chat/completions") && autoCache {
+			if key == "" {
+				key = strings.TrimSpace(
+					strings.TrimPrefix(
+						newRequest.Header.Get("Authorization"),
+						"Bearer",
+					),
+				)
+			}
+			go persistence.RemoveInactiveCaches(
+				hashKey(key),
+				time.Now().
+					Add(-time.Duration(cacheCleanup)*time.Second).
+					Format(time.DateTime),
+			)
+			var requestObject struct {
+				Messages []*MoonshotMessage `json:"messages"`
+				Tools    json.RawMessage    `json:"tools"`
+			}
+			if err = json.Unmarshal(requestBody, &requestObject); err == nil {
+				hashList, nBytes := hashPrefix(
+					cacheMinBytes,
+					requestObject.Tools,
+					requestObject.Messages,
+				)
+				if len(hashList) > 0 {
+					var (
+						cache   *Cache
+						cacheID string
+					)
+					cacheID, err = persistence.GetCacheByHashList(r.Context(), hashList, nBytes/2, hashKey(key))
+					switch {
+					case err == nil:
+						if cache, err = caching.Get(r.Context(), key, cacheID); err == nil && cache.Status != "error" {
+							go persistence.UpdateCache(cacheID, time.Now().Format(time.DateTime))
+							newRequest.Header.Set("X-Msh-Context-Cache", cacheID)
+							newRequest.Header.Set("X-Msh-Context-Cache-Reset-TTL", strconv.Itoa(cacheTTL))
+						}
+					case errors.Is(err, sql.ErrNoRows):
+						rawMessages := gjson.GetBytes(requestBody, "messages").String()
+						cache = &Cache{
+							Messages: json.RawMessage(rawMessages),
+							Tools:    requestObject.Tools,
+							TTL:      cacheTTL,
+						}
+						if err = caching.Create(r.Context(), key, cache); err == nil {
+							hash := hashList[len(hashList)-1]
+							if err = persistence.SetCache(
+								r.Context(),
+								cache.ID,
+								hash,
+								nBytes,
+								hashKey(key),
+								time.Now().Format(time.DateTime),
+							); err == nil {
+								newRequest.Header.Set("X-Msh-Context-Cache", cache.ID)
+								newRequest.Header.Set("X-Msh-Context-Cache-Reset-TTL", strconv.Itoa(cacheTTL))
+							}
+						}
+					default:
+						// To avoid affecting proxy requests, we will act as if nothing happened for other errors.
+					}
+				}
+			}
 		}
 		createdAt = time.Now()
 		newResponse, err = httpClient.Do(newRequest)
@@ -622,9 +747,11 @@ type MoonshotChoice struct {
 }
 
 type MoonshotMessage struct {
+	Role      string `json:"role"`
 	Content   string `json:"content"`
 	ToolCalls []*struct {
 		Function *struct {
+			Name      string `json:"name"`
 			Arguments string `json:"arguments"`
 		} `json:"function"`
 	} `json:"tool_calls"`
