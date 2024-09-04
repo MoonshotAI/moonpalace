@@ -145,7 +145,7 @@ func listCommand() *cobra.Command {
 	flags.Int64VarP(&n, "n", "n", 10, "number of results to return")
 	flags.BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	flags.BoolVar(&chatOnly, "chatonly", false, "chat only output")
-	flags.StringArrayVar(&predicates, "predicate", nil, "predicate is used to set the conditions for query requests")
+	flags.StringArrayVarP(&predicates, "predicate", "p", nil, "predicate is used to set the conditions for query requests")
 	flags.StringVar(&export, "export", "", "export requests to directory")
 	flags.BoolVar(&escapeHTML, "escape-html", false, "specifies whether problematic HTML characters should be escaped")
 	cmd.MarkPersistentFlagDirname("export")

@@ -18,7 +18,19 @@ func Parse(predicate string) (string, error) {
 	if l.err != nil {
 		return "", l.err
 	}
-	return l.P, nil
+	return l.T.String(), nil
+}
+
+func ParseAST(predicate string) (*Tree, error) {
+	l := &lexer{raw: predicate}
+	if status := predicateParse(l); status != 0 {
+		return nil, l.err
+	}
+	if l.err != nil {
+		return nil, l.err
+	}
+	l.T.Transform()
+	return &l.T, nil
 }
 
 var operators = map[string]int{
@@ -27,6 +39,8 @@ var operators = map[string]int{
 	"=": EQUAL,
 	"!": NOT,
 	"~": LIKE,
+	"%": MATCH,
+	"@": IN,
 	"-": MINUS,
 	"&": AND,
 	"|": OR,
@@ -38,7 +52,7 @@ const (
 )
 
 type lexer struct {
-	P   string
+	T   Tree
 	raw string
 	idx int
 	end bool
@@ -46,7 +60,10 @@ type lexer struct {
 }
 
 func (l *lexer) Lex(lval *predicateSymType) int {
-	lval.predicate = &l.P
+	lval.tree = &l.T
+	lval.lits = new(LiteralListExpr)
+	lval.fields = new(FieldsExpr)
+	lval.predicate = new(ComboExpr)
 	token, ok := l.next()
 	if !ok {
 		if !l.end {
@@ -58,11 +75,22 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 	if len(token) == 0 {
 		return Unknown
 	}
-	if token == "." {
+	switch token {
+	case ",":
+		return COMMA
+	case ".":
 		return DOT
+	case "(":
+		return LPAREN
+	case ")":
+		return RPAREN
+	case "[":
+		return LBRACK
+	case "]":
+		return RBRACK
 	}
 	if op, ok := operators[token]; ok {
-		lval.operator = token
+		lval.operator = operatorTypes[op-GREATER]
 		return op
 	}
 	switch token[0] {
@@ -78,7 +106,10 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 		if len(token) < 2 || !strings.HasSuffix(token, "'") {
 			return Unknown
 		}
-		lval.lit = token
+		lval.lit = &LiteralExpr{
+			Type:  String,
+			Value: token[1 : len(token)-1],
+		}
 		return STRING
 	}
 	var (
@@ -93,19 +124,25 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 		intToken = intToken[size:]
 	}
 	if isInt {
-		lval.lit = token
+		lval.lit = &LiteralExpr{
+			Type:  Decimal,
+			Value: token,
+		}
 		return INTEGER
 	}
 	switch strings.ToLower(token) {
 	case "true", "false":
-		lval.lit = token
+		lval.lit = &LiteralExpr{
+			Type:  Boolean,
+			Value: token,
+		}
 		return BOOLEAN
 	case "null":
-		lval.lit = token
+		lval.lit = Null
 		return NULL
 	}
 	if isIdent(token) {
-		lval.ident = token
+		lval.ident = &Ident{Name: token}
 		return IDENT
 	}
 	return Unknown
@@ -138,7 +175,7 @@ func (l *lexer) next() (string, bool) {
 
 	for ; l.idx < len(line); l.idx++ {
 		switch ch := line[l.idx]; ch {
-		case ';', ',', '(', ')', '.', '=', '?', '+', '-', '*', '/', '>', '<', '!', '~', '&', '|':
+		case ';', ',', '(', ')', '[', ']', '{', '}', '.', '=', '?', '+', '-', '*', '/', '>', '<', '!', '~', '%', '@', '&', '|':
 			if doubleQuoted || singleQuoted || backQuoted {
 				arg = append(arg, ch)
 			} else {
@@ -198,6 +235,9 @@ func isIdent(token string) bool {
 	if len(token) == 0 {
 		return false
 	}
+	if strings.HasPrefix(token, "`") && strings.HasSuffix(token, "`") {
+		token = token[1 : len(token)-1]
+	}
 	for i := 0; len(token) > 0; i++ {
 		ch, size := utf8.DecodeRuneInString(token)
 		if i == 0 {
@@ -214,30 +254,34 @@ func isIdent(token string) bool {
 	return true
 }
 
-func makeLHS(fields []string) string {
-	switch len(fields) {
+func makeLHS(expr *FieldsExpr) string {
+	switch len(expr.Fields) {
 	case 0:
 		return ""
 	case 1:
-		return fields[0]
+		// This must be the *Ident type.
+		return expr.Fields[0].(*Ident).Name
 	default:
 		var patternBuilder strings.Builder
-		for i, field := range fields {
+		for i, field := range expr.Fields {
 			if i == 0 {
 				patternBuilder.WriteString("$")
 				continue
 			}
-			intField, err := strconv.Atoi(field)
-			if isInt := err == nil; isInt {
+			lit, isLit := field.(*LiteralExpr)
+			if isLit && lit.Type == Decimal {
 				patternBuilder.WriteString("[")
-				if intField < 0 {
+				// Actually, the Value should be converted to an Integer
+				// before checking if it is less than 0, but we want to
+				// take a shortcut.
+				if strings.HasPrefix(lit.Value, "-") {
 					patternBuilder.WriteString("#")
 				}
-				patternBuilder.WriteString(field)
+				patternBuilder.WriteString(lit.Value)
 				patternBuilder.WriteString("]")
 			} else {
 				patternBuilder.WriteString(".")
-				patternBuilder.WriteString(field)
+				patternBuilder.WriteString(field.(*Ident).Name)
 			}
 		}
 		return fmt.Sprintf(
@@ -246,18 +290,74 @@ func makeLHS(fields []string) string {
 			// SQLite will consider the value passed to json_extract as an illegal
 			// value, which will lead to an error.
 			"json_valid(%[1]s) and json_extract(%[1]s, '%[2]s')",
-			fields[0],
+			expr.Fields[0].(*Ident).Name,
 			patternBuilder.String(),
 		)
 	}
 }
 
-func toConnector(operator string) string {
-	switch operator {
-	case "&&":
-		return "and"
-	case "||":
-		return "or"
+func toOperator(operators []*OperatorType, isNull bool) string {
+	switch len(operators) {
+	case 1:
+		op := operators[0]
+		switch op {
+		case Greater:
+			return ">"
+		case Less:
+			return "<"
+		case Like:
+			return "like"
+		case Match:
+			return "regexp"
+		case In:
+			return "in"
+		}
+	case 2:
+		op1, op2 := operators[0], operators[1]
+		switch op1 {
+		case Greater:
+			switch op2 {
+			case Equal:
+				return ">="
+			}
+		case Less:
+			switch op2 {
+			case Equal:
+				return "<="
+			}
+		case Equal:
+			switch op2 {
+			case Equal:
+				if isNull {
+					return "is"
+				}
+				return "="
+			}
+		case Not:
+			switch op2 {
+			case Equal:
+				if isNull {
+					return "is not"
+				}
+				return "!="
+			case Like:
+				return "not like"
+			case Match:
+				return "not regexp"
+			case In:
+				return "not in"
+			}
+		case And:
+			switch op2 {
+			case And:
+				return "and"
+			}
+		case Or:
+			switch op2 {
+			case Or:
+				return "or"
+			}
+		}
 	}
-	return operator
+	panic("unreachable")
 }

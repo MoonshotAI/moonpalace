@@ -5,89 +5,173 @@ package predicate
 %}
 
 %union {
-    predicate *string
-    operator  string
-    ident     string
-    lit       string
-    fields    []string
-    expr      string
+    tree      *Tree
+    operator  *OperatorType
+    operators []*OperatorType
+    ident     *Ident
+    lit       *LiteralExpr
+    lits      *LiteralListExpr
+    fields    *FieldsExpr
+    expr      Expr
+    predicate *ComboExpr
 }
 
-%token             DOT END
-%token <operator>  GREATER LESS EQUAL NOT LIKE MINUS AND OR
+%token             COMMA DOT LPAREN RPAREN LBRACK RBRACK END
+%token <operator>  GREATER LESS EQUAL NOT LIKE MATCH IN MINUS AND OR
 %token <ident>     IDENT
 %token <lit>       STRING BOOLEAN INTEGER NULL
 
 %type  <fields>    fields
 %type  <lit>       lit integer decimal
-%type  <operator>  symbol logic
-%type  <expr>      expr predicate
-%type  <predicate> top
+%type  <lits>      lits
+%type  <operators> symbol logic
+%type  <expr>      expr
+%type  <predicate> predicate
+%type  <tree>      top
 
 %%
 
 top:
     predicate END
     {
-        *$$ = $1
+        $$.Expr = $1
     }
 
 predicate:
     expr
     {
-        $$ = $1
+        $$.Items = []ComboItem{$1}
     }
 |   predicate logic expr
     {
-        $$ = $1 + " " + toConnector($2) + " " + $3
+        $$.Items = append($1.Items, $2)
+        $$.Items = append($1.Items, $3)
     }
 
 expr:
-    fields symbol lit
+    LPAREN predicate RPAREN
     {
-        $$ = makeLHS($1) + " " + $2 + " " + $3
+        $$ = &ParenExpr{
+            Expr: $2,
+        }
+    }
+|   fields symbol lit
+    {
+        $$ = &BinaryExpr{
+            Op:    $2,
+            Left:  $1,
+            Right: $3,
+        }
     }
 |   fields EQUAL EQUAL NULL
     {
-        $$ = makeLHS($1) + " is " + $4
+        $$ = &BinaryExpr{
+            Op:    []*OperatorType{$2, $3},
+            Left:  $1,
+            Right: $4,
+        }
     }
 |   fields NOT EQUAL NULL
     {
-        $$ = makeLHS($1) + " is not " + $4
+        $$ = &BinaryExpr{
+            Op:    []*OperatorType{$2, $3},
+            Left:  $1,
+            Right: $4,
+        }
     }
-|   fields LIKE lit
+|   fields LIKE STRING
     {
-        $$ = makeLHS($1) + " like concat('%', " + $3 + ", '%')"
+        $$ = &BinaryExpr{
+            Op:    []*OperatorType{$2},
+            Left:  $1,
+            Right: $3,
+        }
+    }
+|   fields NOT LIKE STRING
+    {
+        $$ = &BinaryExpr{
+            Op:    []*OperatorType{$2, $3},
+            Left:  $1,
+            Right: $4,
+        }
+    }
+|   fields MATCH STRING
+    {
+        $$ = &BinaryExpr{
+            Op:    []*OperatorType{$2},
+            Left:  $1,
+            Right: $3,
+        }
+    }
+|   fields NOT MATCH STRING
+    {
+        $$ = &BinaryExpr{
+            Op:    []*OperatorType{$2, $3},
+            Left:  $1,
+            Right: $4,
+        }
+    }
+|   fields IN LBRACK lits RBRACK
+    {
+        $$ = &BinaryExpr{
+            Op:    []*OperatorType{$2},
+            Left:  $1,
+            Right: $4,
+        }
+    }
+|   fields NOT IN LBRACK lits RBRACK
+    {
+        $$ = &BinaryExpr{
+            Op:    []*OperatorType{$2, $3},
+            Left:  $1,
+            Right: $5,
+        }
     }
 
 symbol:
     GREATER
+    {
+        $$ = []*OperatorType{$1}
+    }
 |   LESS
+    {
+        $$ = []*OperatorType{$1}
+    }
 |   GREATER EQUAL
     {
-        $$ = $1 + $2
+        $$ = []*OperatorType{$1, $2}
     }
 |   LESS EQUAL
     {
-        $$ = $1 + $2
+        $$ = []*OperatorType{$1, $2}
     }
 |   EQUAL EQUAL
     {
-        $$ = $1
+        $$ = []*OperatorType{$1, $2}
     }
 |   NOT EQUAL
     {
-        $$ = $1 + $2
+        $$ = []*OperatorType{$1, $2}
     }
 
 logic:
     AND AND
     {
-        $$ = $1 + $2
+        $$ = []*OperatorType{$1, $2}
     }
 |   OR OR
     {
-        $$ = $1 + $2
+        $$ = []*OperatorType{$1, $2}
+    }
+
+lits:
+    lits COMMA lit
+    {
+        $$.List = append($1.List, $3)
+    }
+|   lit
+    {
+        $$.List = []*LiteralExpr{$1}
     }
 
 lit:
@@ -99,32 +183,35 @@ integer:
     INTEGER
 |   MINUS INTEGER
     {
-        $$ = $1 + $2
+        $2.Value = "-" + $2.Value
+        $$ = $2
     }
 
 decimal:
     integer
 |   MINUS INTEGER DOT INTEGER
     {
-        $$ = $1 + $2 + "." + $4
+        $2.Value = "-" + $2.Value + "." + $4.Value
+        $$ = $2
     }
 |   INTEGER DOT INTEGER
     {
-        $$ = $1 + "." + $3
+        $1.Value = $1.Value + "." + $3.Value
+        $$ = $1
     }
 
 fields:
     fields DOT IDENT
     {
-        $$ = append($1, $3)
+        $$.Fields = append($1.Fields, $3)
     }
 |   fields DOT integer
     {
-        $$ = append($1, $3)
+        $$.Fields = append($1.Fields, $3)
     }
 |   IDENT
     {
-        $$ = append($$, $1)
+        $$.Fields = append($$.Fields, $1)
     }
 
 %%

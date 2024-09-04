@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +30,9 @@ func init() {
 	sql.Register(sqlDriver, &sqlite3.SQLiteDriver{
 		ConnectHook: func(conn *sqlite3.SQLiteConn) error {
 			if err := conn.RegisterFunc("merge_cmpl", mergeCompletion, true); err != nil {
+				return err
+			}
+			if err := conn.RegisterFunc("regexp", sqliteRegexp, true); err != nil {
 				return err
 			}
 			return nil
@@ -674,4 +678,9 @@ func (p Predicates) Parse() (string, error) {
 		sqlBuilder.WriteString("(" + parsed + ")")
 	}
 	return sqlBuilder.String(), nil
+}
+
+func sqliteRegexp(pat string, val string) bool {
+	match, _ := regexp.MatchString(pat, val)
+	return match
 }

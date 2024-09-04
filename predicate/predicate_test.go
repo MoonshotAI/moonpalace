@@ -28,6 +28,10 @@ func TestParse(t *testing.T) {
 				want:      "response_status_code = 200",
 			},
 			{
+				predicate: "`response_status_code` == 200",
+				want:      "`response_status_code` = 200",
+			},
+			{
 				predicate: "response_status_code == null",
 				want:      "response_status_code is null",
 			},
@@ -41,11 +45,59 @@ func TestParse(t *testing.T) {
 			},
 			{
 				predicate: "response_body ~ 'data:'",
-				want:      "response_body like concat('%', 'data:', '%')",
+				want:      "response_body like '%data:%'",
+			},
+			{
+				predicate: "response_body !~ 'data:'",
+				want:      "response_body not like '%data:%'",
+			},
+			{
+				predicate: "response_body ~ 'data*:'",
+				want:      "response_body like '%data*:%'",
+			},
+			{
+				predicate: "response_body ~ '*data:'",
+				want:      "response_body like '%data:'",
+			},
+			{
+				predicate: "response_body ~ '**data:'",
+				want:      "response_body like '%*data:'",
+			},
+			{
+				predicate: "response_body ~ 'data:*'",
+				want:      "response_body like 'data:%'",
+			},
+			{
+				predicate: "response_body ~ 'data:**'",
+				want:      "response_body like 'data:*%'",
+			},
+			{
+				predicate: "response_body % '^data.*$'",
+				want:      "response_body regexp '^data.*$'",
+			},
+			{
+				predicate: "response_body !% '^data.*$'",
+				want:      "response_body not regexp '^data.*$'",
+			},
+			{
+				predicate: "response_status_code @ [400, 401, '403', 404, false]",
+				want:      "response_status_code in (400, 401, '403', 404, false)",
+			},
+			{
+				predicate: "response_status_code @ [400]",
+				want:      "response_status_code in (400)",
+			},
+			{
+				predicate: "response_status_code !@ [400, 401, '403', 404]",
+				want:      "response_status_code not in (400, 401, '403', 404)",
 			},
 			{
 				predicate: "request_body.messages.0.role == \"system\" && response_status_code == 200",
 				want:      "json_valid(request_body) and json_extract(request_body, '$.messages[0].role') = 'system' and response_status_code = 200",
+			},
+			{
+				predicate: "request_body.messages.0.role == \"system\" && ( response_status_code == 200 || response_status_code == 204 )",
+				want:      "json_valid(request_body) and json_extract(request_body, '$.messages[0].role') = 'system' and (response_status_code = 200 or response_status_code = 204)",
 			},
 		}
 		for i, tc := range testcases {
@@ -68,6 +120,10 @@ func TestParse(t *testing.T) {
 			"3.14.role == 'user'",
 			"response_content_type == 'application/json' & response_status_code == 200",
 			"response_content_type == 'application/json' | response_status_code == 200",
+			"response_status_code ~ 200",
+			"response_status_code % 200",
+			"response_status_code @ (400, 401)",
+			"response_status_code @ [401, '403', null, false]",
 			"response_header ~ 'pytest''",
 		}
 		for i, predicate := range predicates {
@@ -79,4 +135,24 @@ func TestParse(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestParseAST(t *testing.T) {
+	tree, err := ParseAST(`
+		request_body.messages.0.role == "system" && 
+		request_path ~ '*/chat/completions' || 
+		(
+			request_header % '^pytest-.*?$' &&
+			( request_query  ~ 'fingerprint=*' )
+		) &&
+		response_status_code @ [200, 204]
+	`)
+	if err != nil {
+		t.Errorf("parsing AST: %s", err)
+		return
+	}
+	if _, isBin := tree.Expr.(*BinaryExpr); !isBin {
+		t.Errorf("parsing AST: expects binary expression, got %T", tree.Expr)
+		return
+	}
 }

@@ -11,41 +11,58 @@ import __yyfmt__ "fmt"
 //line predicate.y:7
 type predicateSymType struct {
 	yys       int
-	predicate *string
-	operator  string
-	ident     string
-	lit       string
-	fields    []string
-	expr      string
+	tree      *Tree
+	operator  *OperatorType
+	operators []*OperatorType
+	ident     *Ident
+	lit       *LiteralExpr
+	lits      *LiteralListExpr
+	fields    *FieldsExpr
+	expr      Expr
+	predicate *ComboExpr
 }
 
-const DOT = 57346
-const END = 57347
-const GREATER = 57348
-const LESS = 57349
-const EQUAL = 57350
-const NOT = 57351
-const LIKE = 57352
-const MINUS = 57353
-const AND = 57354
-const OR = 57355
-const IDENT = 57356
-const STRING = 57357
-const BOOLEAN = 57358
-const INTEGER = 57359
-const NULL = 57360
+const COMMA = 57346
+const DOT = 57347
+const LPAREN = 57348
+const RPAREN = 57349
+const LBRACK = 57350
+const RBRACK = 57351
+const END = 57352
+const GREATER = 57353
+const LESS = 57354
+const EQUAL = 57355
+const NOT = 57356
+const LIKE = 57357
+const MATCH = 57358
+const IN = 57359
+const MINUS = 57360
+const AND = 57361
+const OR = 57362
+const IDENT = 57363
+const STRING = 57364
+const BOOLEAN = 57365
+const INTEGER = 57366
+const NULL = 57367
 
 var predicateToknames = [...]string{
 	"$end",
 	"error",
 	"$unk",
+	"COMMA",
 	"DOT",
+	"LPAREN",
+	"RPAREN",
+	"LBRACK",
+	"RBRACK",
 	"END",
 	"GREATER",
 	"LESS",
 	"EQUAL",
 	"NOT",
 	"LIKE",
+	"MATCH",
+	"IN",
 	"MINUS",
 	"AND",
 	"OR",
@@ -62,7 +79,7 @@ const predicateEofCode = 1
 const predicateErrCode = 2
 const predicateInitialStackSize = 16
 
-//line predicate.y:130
+//line predicate.y:217
 
 //line yacctab:1
 var predicateExca = [...]int8{
@@ -73,54 +90,65 @@ var predicateExca = [...]int8{
 
 const predicatePrivate = 57344
 
-const predicateLast = 43
+const predicateLast = 66
 
 var predicateAct = [...]int8{
-	25, 39, 38, 43, 21, 22, 26, 33, 42, 40,
-	30, 36, 14, 32, 15, 16, 11, 12, 13, 6,
-	24, 5, 20, 19, 18, 35, 8, 9, 34, 28,
-	27, 3, 41, 37, 1, 31, 29, 2, 7, 17,
-	10, 23, 4,
+	54, 53, 30, 49, 48, 61, 26, 27, 31, 43,
+	57, 55, 40, 25, 46, 42, 18, 51, 50, 38,
+	37, 24, 19, 20, 13, 14, 15, 16, 17, 4,
+	7, 29, 23, 9, 10, 22, 56, 45, 44, 9,
+	10, 32, 52, 33, 6, 34, 35, 36, 60, 3,
+	41, 60, 1, 62, 58, 47, 59, 39, 21, 2,
+	8, 63, 12, 28, 11, 5,
 }
 
 var predicatePact = [...]int16{
-	7, -1000, 14, -1000, 8, -1000, -1000, 7, 12, 10,
-	-11, 22, 21, -11, -4, 20, 17, -1000, -1000, -1000,
-	-1000, -1000, -1000, -1000, -1000, -6, 29, -16, -17, -1000,
-	-1000, -1000, -1000, -8, -1000, -1000, 28, -9, -1000, -1000,
-	-1000, -14, -1000, -1000,
+	23, -1000, 20, -1000, 23, 11, -1000, -1000, 23, 16,
+	12, 14, -16, 28, 30, -2, -3, 49, -9, 25,
+	24, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000, -1000,
+	-10, 50, -21, -22, -4, -5, 34, -1000, -1000, -16,
+	-1000, -1000, -1000, -13, -1000, -1000, 31, -14, -1000, -1000,
+	-1000, -1000, -16, 47, -1000, -1000, -19, -1000, 44, -1000,
+	-16, -1000, -1000, -1000,
 }
 
 var predicatePgo = [...]int8{
-	0, 42, 22, 20, 41, 40, 38, 31, 37, 34,
+	0, 65, 0, 31, 63, 1, 62, 60, 49, 59,
+	52,
 }
 
 var predicateR1 = [...]int8{
-	0, 9, 8, 8, 7, 7, 7, 7, 5, 5,
-	5, 5, 5, 5, 6, 6, 2, 2, 2, 3,
-	3, 4, 4, 4, 1, 1, 1,
+	0, 10, 9, 9, 8, 8, 8, 8, 8, 8,
+	8, 8, 8, 8, 6, 6, 6, 6, 6, 6,
+	7, 7, 5, 5, 2, 2, 2, 3, 3, 4,
+	4, 4, 1, 1, 1,
 }
 
 var predicateR2 = [...]int8{
-	0, 2, 1, 3, 3, 4, 4, 3, 1, 1,
-	2, 2, 2, 2, 2, 2, 1, 1, 1, 1,
-	2, 1, 4, 3, 3, 3, 1,
+	0, 2, 1, 3, 3, 3, 4, 4, 3, 4,
+	3, 4, 5, 6, 1, 1, 2, 2, 2, 2,
+	2, 2, 3, 1, 1, 1, 1, 1, 2, 1,
+	4, 3, 3, 3, 1,
 }
 
 var predicateChk = [...]int16{
-	-1000, -9, -8, -7, -1, 14, 5, -6, 12, 13,
-	-5, 8, 9, 10, 4, 6, 7, -7, 12, 13,
-	-2, 15, 16, -4, -3, 11, 17, 8, 8, -2,
-	14, -3, 17, 11, 8, 8, 17, 4, 18, 18,
-	17, 4, 17, 17,
+	-1000, -10, -9, -8, 6, -1, 21, 10, -7, 19,
+	20, -9, -6, 13, 14, 15, 16, 17, 5, 11,
+	12, -8, 19, 20, 7, -2, 22, 23, -4, -3,
+	18, 24, 13, 13, 15, 16, 17, 22, 22, 8,
+	21, -3, 24, 18, 13, 13, 24, 5, 25, 25,
+	22, 22, 8, -5, -2, 24, 5, 24, -5, 9,
+	4, 24, 9, -2,
 }
 
 var predicateDef = [...]int8{
-	0, -2, 0, 2, 0, 26, 1, 0, 0, 0,
-	0, 0, 0, 0, 0, 8, 9, 3, 14, 15,
-	4, 16, 17, 18, 21, 0, 19, 12, 13, 7,
-	24, 25, 19, 0, 10, 11, 20, 0, 5, 6,
-	20, 0, 23, 22,
+	0, -2, 0, 2, 0, 0, 34, 1, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 14,
+	15, 3, 20, 21, 4, 5, 24, 25, 26, 29,
+	0, 27, 18, 19, 0, 0, 0, 8, 10, 0,
+	32, 33, 27, 0, 16, 17, 28, 0, 6, 7,
+	9, 11, 0, 0, 23, 28, 0, 31, 0, 12,
+	0, 30, 13, 22,
 }
 
 var predicateTok1 = [...]int8{
@@ -129,7 +157,8 @@ var predicateTok1 = [...]int8{
 
 var predicateTok2 = [...]int8{
 	2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-	12, 13, 14, 15, 16, 17, 18,
+	12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+	22, 23, 24, 25,
 }
 
 var predicateTok3 = [...]int8{
@@ -475,117 +504,219 @@ predicatedefault:
 
 	case 1:
 		predicateDollar = predicateS[predicatept-2 : predicatept+1]
-//line predicate.y:31
+//line predicate.y:36
 		{
-			*predicateVAL.predicate = predicateDollar[1].expr
+			predicateVAL.tree.Expr = predicateDollar[1].predicate
 		}
 	case 2:
 		predicateDollar = predicateS[predicatept-1 : predicatept+1]
-//line predicate.y:37
+//line predicate.y:42
 		{
-			predicateVAL.expr = predicateDollar[1].expr
+			predicateVAL.predicate.Items = []ComboItem{predicateDollar[1].expr}
 		}
 	case 3:
 		predicateDollar = predicateS[predicatept-3 : predicatept+1]
-//line predicate.y:41
+//line predicate.y:46
 		{
-			predicateVAL.expr = predicateDollar[1].expr + " " + toConnector(predicateDollar[2].operator) + " " + predicateDollar[3].expr
+			predicateVAL.predicate.Items = append(predicateDollar[1].predicate.Items, predicateDollar[2].operators)
+			predicateVAL.predicate.Items = append(predicateDollar[1].predicate.Items, predicateDollar[3].expr)
 		}
 	case 4:
 		predicateDollar = predicateS[predicatept-3 : predicatept+1]
-//line predicate.y:47
+//line predicate.y:53
 		{
-			predicateVAL.expr = makeLHS(predicateDollar[1].fields) + " " + predicateDollar[2].operator + " " + predicateDollar[3].lit
+			predicateVAL.expr = &ParenExpr{
+				Expr: predicateDollar[2].predicate,
+			}
 		}
 	case 5:
-		predicateDollar = predicateS[predicatept-4 : predicatept+1]
-//line predicate.y:51
-		{
-			predicateVAL.expr = makeLHS(predicateDollar[1].fields) + " is " + predicateDollar[4].lit
-		}
-	case 6:
-		predicateDollar = predicateS[predicatept-4 : predicatept+1]
-//line predicate.y:55
-		{
-			predicateVAL.expr = makeLHS(predicateDollar[1].fields) + " is not " + predicateDollar[4].lit
-		}
-	case 7:
 		predicateDollar = predicateS[predicatept-3 : predicatept+1]
 //line predicate.y:59
 		{
-			predicateVAL.expr = makeLHS(predicateDollar[1].fields) + " like concat('%', " + predicateDollar[3].lit + ", '%')"
+			predicateVAL.expr = &BinaryExpr{
+				Op:    predicateDollar[2].operators,
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[3].lit,
+			}
 		}
-	case 10:
-		predicateDollar = predicateS[predicatept-2 : predicatept+1]
+	case 6:
+		predicateDollar = predicateS[predicatept-4 : predicatept+1]
 //line predicate.y:67
 		{
-			predicateVAL.operator = predicateDollar[1].operator + predicateDollar[2].operator
+			predicateVAL.expr = &BinaryExpr{
+				Op:    []*OperatorType{predicateDollar[2].operator, predicateDollar[3].operator},
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[4].lit,
+			}
 		}
-	case 11:
-		predicateDollar = predicateS[predicatept-2 : predicatept+1]
-//line predicate.y:71
-		{
-			predicateVAL.operator = predicateDollar[1].operator + predicateDollar[2].operator
-		}
-	case 12:
-		predicateDollar = predicateS[predicatept-2 : predicatept+1]
+	case 7:
+		predicateDollar = predicateS[predicatept-4 : predicatept+1]
 //line predicate.y:75
 		{
-			predicateVAL.operator = predicateDollar[1].operator
+			predicateVAL.expr = &BinaryExpr{
+				Op:    []*OperatorType{predicateDollar[2].operator, predicateDollar[3].operator},
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[4].lit,
+			}
+		}
+	case 8:
+		predicateDollar = predicateS[predicatept-3 : predicatept+1]
+//line predicate.y:83
+		{
+			predicateVAL.expr = &BinaryExpr{
+				Op:    []*OperatorType{predicateDollar[2].operator},
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[3].lit,
+			}
+		}
+	case 9:
+		predicateDollar = predicateS[predicatept-4 : predicatept+1]
+//line predicate.y:91
+		{
+			predicateVAL.expr = &BinaryExpr{
+				Op:    []*OperatorType{predicateDollar[2].operator, predicateDollar[3].operator},
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[4].lit,
+			}
+		}
+	case 10:
+		predicateDollar = predicateS[predicatept-3 : predicatept+1]
+//line predicate.y:99
+		{
+			predicateVAL.expr = &BinaryExpr{
+				Op:    []*OperatorType{predicateDollar[2].operator},
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[3].lit,
+			}
+		}
+	case 11:
+		predicateDollar = predicateS[predicatept-4 : predicatept+1]
+//line predicate.y:107
+		{
+			predicateVAL.expr = &BinaryExpr{
+				Op:    []*OperatorType{predicateDollar[2].operator, predicateDollar[3].operator},
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[4].lit,
+			}
+		}
+	case 12:
+		predicateDollar = predicateS[predicatept-5 : predicatept+1]
+//line predicate.y:115
+		{
+			predicateVAL.expr = &BinaryExpr{
+				Op:    []*OperatorType{predicateDollar[2].operator},
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[4].lits,
+			}
 		}
 	case 13:
-		predicateDollar = predicateS[predicatept-2 : predicatept+1]
-//line predicate.y:79
+		predicateDollar = predicateS[predicatept-6 : predicatept+1]
+//line predicate.y:123
 		{
-			predicateVAL.operator = predicateDollar[1].operator + predicateDollar[2].operator
+			predicateVAL.expr = &BinaryExpr{
+				Op:    []*OperatorType{predicateDollar[2].operator, predicateDollar[3].operator},
+				Left:  predicateDollar[1].fields,
+				Right: predicateDollar[5].lits,
+			}
 		}
 	case 14:
-		predicateDollar = predicateS[predicatept-2 : predicatept+1]
-//line predicate.y:85
+		predicateDollar = predicateS[predicatept-1 : predicatept+1]
+//line predicate.y:133
 		{
-			predicateVAL.operator = predicateDollar[1].operator + predicateDollar[2].operator
+			predicateVAL.operators = []*OperatorType{predicateDollar[1].operator}
 		}
 	case 15:
-		predicateDollar = predicateS[predicatept-2 : predicatept+1]
-//line predicate.y:89
+		predicateDollar = predicateS[predicatept-1 : predicatept+1]
+//line predicate.y:137
 		{
-			predicateVAL.operator = predicateDollar[1].operator + predicateDollar[2].operator
+			predicateVAL.operators = []*OperatorType{predicateDollar[1].operator}
+		}
+	case 16:
+		predicateDollar = predicateS[predicatept-2 : predicatept+1]
+//line predicate.y:141
+		{
+			predicateVAL.operators = []*OperatorType{predicateDollar[1].operator, predicateDollar[2].operator}
+		}
+	case 17:
+		predicateDollar = predicateS[predicatept-2 : predicatept+1]
+//line predicate.y:145
+		{
+			predicateVAL.operators = []*OperatorType{predicateDollar[1].operator, predicateDollar[2].operator}
+		}
+	case 18:
+		predicateDollar = predicateS[predicatept-2 : predicatept+1]
+//line predicate.y:149
+		{
+			predicateVAL.operators = []*OperatorType{predicateDollar[1].operator, predicateDollar[2].operator}
+		}
+	case 19:
+		predicateDollar = predicateS[predicatept-2 : predicatept+1]
+//line predicate.y:153
+		{
+			predicateVAL.operators = []*OperatorType{predicateDollar[1].operator, predicateDollar[2].operator}
 		}
 	case 20:
 		predicateDollar = predicateS[predicatept-2 : predicatept+1]
-//line predicate.y:101
+//line predicate.y:159
 		{
-			predicateVAL.lit = predicateDollar[1].operator + predicateDollar[2].lit
+			predicateVAL.operators = []*OperatorType{predicateDollar[1].operator, predicateDollar[2].operator}
+		}
+	case 21:
+		predicateDollar = predicateS[predicatept-2 : predicatept+1]
+//line predicate.y:163
+		{
+			predicateVAL.operators = []*OperatorType{predicateDollar[1].operator, predicateDollar[2].operator}
 		}
 	case 22:
-		predicateDollar = predicateS[predicatept-4 : predicatept+1]
-//line predicate.y:108
+		predicateDollar = predicateS[predicatept-3 : predicatept+1]
+//line predicate.y:169
 		{
-			predicateVAL.lit = predicateDollar[1].operator + predicateDollar[2].lit + "." + predicateDollar[4].lit
+			predicateVAL.lits.List = append(predicateDollar[1].lits.List, predicateDollar[3].lit)
 		}
 	case 23:
-		predicateDollar = predicateS[predicatept-3 : predicatept+1]
-//line predicate.y:112
-		{
-			predicateVAL.lit = predicateDollar[1].lit + "." + predicateDollar[3].lit
-		}
-	case 24:
-		predicateDollar = predicateS[predicatept-3 : predicatept+1]
-//line predicate.y:118
-		{
-			predicateVAL.fields = append(predicateDollar[1].fields, predicateDollar[3].ident)
-		}
-	case 25:
-		predicateDollar = predicateS[predicatept-3 : predicatept+1]
-//line predicate.y:122
-		{
-			predicateVAL.fields = append(predicateDollar[1].fields, predicateDollar[3].lit)
-		}
-	case 26:
 		predicateDollar = predicateS[predicatept-1 : predicatept+1]
-//line predicate.y:126
+//line predicate.y:173
 		{
-			predicateVAL.fields = append(predicateVAL.fields, predicateDollar[1].ident)
+			predicateVAL.lits.List = []*LiteralExpr{predicateDollar[1].lit}
+		}
+	case 28:
+		predicateDollar = predicateS[predicatept-2 : predicatept+1]
+//line predicate.y:185
+		{
+			predicateDollar[2].lit.Value = "-" + predicateDollar[2].lit.Value
+			predicateVAL.lit = predicateDollar[2].lit
+		}
+	case 30:
+		predicateDollar = predicateS[predicatept-4 : predicatept+1]
+//line predicate.y:193
+		{
+			predicateDollar[2].lit.Value = "-" + predicateDollar[2].lit.Value + "." + predicateDollar[4].lit.Value
+			predicateVAL.lit = predicateDollar[2].lit
+		}
+	case 31:
+		predicateDollar = predicateS[predicatept-3 : predicatept+1]
+//line predicate.y:198
+		{
+			predicateDollar[1].lit.Value = predicateDollar[1].lit.Value + "." + predicateDollar[3].lit.Value
+			predicateVAL.lit = predicateDollar[1].lit
+		}
+	case 32:
+		predicateDollar = predicateS[predicatept-3 : predicatept+1]
+//line predicate.y:205
+		{
+			predicateVAL.fields.Fields = append(predicateDollar[1].fields.Fields, predicateDollar[3].ident)
+		}
+	case 33:
+		predicateDollar = predicateS[predicatept-3 : predicatept+1]
+//line predicate.y:209
+		{
+			predicateVAL.fields.Fields = append(predicateDollar[1].fields.Fields, predicateDollar[3].lit)
+		}
+	case 34:
+		predicateDollar = predicateS[predicatept-1 : predicatept+1]
+//line predicate.y:213
+		{
+			predicateVAL.fields.Fields = append(predicateVAL.fields.Fields, predicateDollar[1].ident)
 		}
 	}
 	goto predicatestack /* stack new state and value */
