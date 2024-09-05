@@ -2,7 +2,6 @@ package predicate
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -95,12 +94,10 @@ func (l *lexer) Lex(lval *predicateSymType) int {
 	}
 	switch token[0] {
 	case '"':
-		var unquoteErr error
-		token, unquoteErr = strconv.Unquote(token)
-		if unquoteErr != nil {
+		if len(token) < 2 || !strings.HasSuffix(token, "\"") {
 			return Unknown
 		}
-		token = "'" + token + "'"
+		token = "'" + token[1:len(token)-1] + "'"
 		fallthrough
 	case '\'':
 		if len(token) < 2 || !strings.HasSuffix(token, "'") {

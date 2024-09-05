@@ -99,6 +99,10 @@ func TestParse(t *testing.T) {
 				predicate: "request_body.messages.0.role == \"system\" && ( response_status_code == 200 || response_status_code == 204 )",
 				want:      "json_valid(request_body) and json_extract(request_body, '$.messages[0].role') = 'system' and (response_status_code = 200 or response_status_code = 204)",
 			},
+			{
+				predicate: "response_header % \"Msh-Context-Cache-Token-Saved: \\d+\"",
+				want:      "response_header regexp 'Msh-Context-Cache-Token-Saved: \\d+'",
+			},
 		}
 		for i, tc := range testcases {
 			t.Run(strconv.Itoa(i+1), func(t *testing.T) {
