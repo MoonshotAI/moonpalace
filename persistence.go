@@ -642,16 +642,11 @@ func (t *SqliteTime) Scan(src any) (err error) {
 	return nil
 }
 
-// FIXME mergeCompletion
-// Since the standard for text/event-stream is actually separated by two newline characters,
-// it means that each chunk of content can be line-wrapped. However, currently, because the
-// server does not output JSON with newline characters, the current method (parsing line by
-// line) also works fine but still needs improvement.
-
 func mergeCompletion(data string) string {
 	completion := completionPool.Get().(map[string]any)
 	defer putCompletion(completion)
 	scanner := bufio.NewScanner(strings.NewReader(data))
+	scanner.Split(splitFunc)
 	for scanner.Scan() {
 		if line := bytes.TrimSpace(scanner.Bytes()); len(line) != 0 {
 			if line = bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:"))); !bytes.Equal(line, []byte("[DONE]")) {
@@ -661,6 +656,33 @@ func mergeCompletion(data string) string {
 	}
 	merged, _ := json.Marshal(completion)
 	return string(merged)
+}
+
+func splitFunc(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	// \n\n \n\r\n already covers all possible double line break situations.
+	//
+	// The process of parsing JSON does not care about the number of whitespace
+	// characters at its beginning and end.
+	i, j := bytes.Index(data, []byte("\n\n")), bytes.Index(data, []byte("\n\r\n"))
+	switch {
+	case i >= 0 && j >= 0:
+		if i < j {
+			return i + 2, data[:i], nil
+		} else {
+			return j + 3, data[:j], nil
+		}
+	case i >= 0:
+		return i + 2, data[:i], nil
+	case j >= 0:
+		return j + 3, data[:j], nil
+	}
+	if atEOF {
+		return len(data), data, nil
+	}
+	return 0, nil, nil
 }
 
 type Predicates []string

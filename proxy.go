@@ -513,11 +513,13 @@ func buildProxy(
 				}
 				defer gzipReader.Close()
 				scanner = bufio.NewScanner(gzipReader)
-				gzipWriter, _ := gzip.NewWriterLevel(w, gzip.BestSpeed)
+				scanner.Split(splitFunc)
+				gzipWriter, _ := gzip.NewWriterLevel(w, gzip.NoCompression)
 				defer gzipWriter.Close()
 				responseWriter = gzipWriter
 			} else {
 				scanner = bufio.NewScanner(newResponse.Body)
+				scanner.Split(splitFunc)
 				responseWriter = w
 			}
 		READLINES:
