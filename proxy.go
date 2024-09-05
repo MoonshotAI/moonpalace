@@ -178,6 +178,17 @@ var (
 			return make(map[string]any)
 		},
 	}
+	gzipReaderPool = &sync.Pool{
+		New: func() any {
+			return new(gzip.Reader)
+		},
+	}
+	gzipWriterPool = &sync.Pool{
+		New: func() any {
+			z, _ := gzip.NewWriterLevel(nil, gzip.BestCompression)
+			return z
+		},
+	}
 	merger = &merge.Merger{
 		StreamFields: []string{"content", "arguments"},
 		IndexFields:  []string{"index"},
@@ -197,6 +208,29 @@ func putCompletion(completion map[string]any) {
 		delete(completion, objectKey)
 	}
 	completionPool.Put(completion)
+}
+
+func getGzipReader(reader io.Reader) (*gzip.Reader, error) {
+	gzipReader := gzipReaderPool.Get().(*gzip.Reader)
+	if err := gzipReader.Reset(reader); err != nil {
+		putGzipReader(gzipReader)
+		return nil, err
+	}
+	return gzipReader, nil
+}
+
+func putGzipReader(reader *gzip.Reader) {
+	gzipReaderPool.Put(reader)
+}
+
+func getGzipWriter(writer io.Writer) *gzip.Writer {
+	gzipWriter := gzipWriterPool.Get().(*gzip.Writer)
+	gzipWriter.Reset(writer)
+	return gzipWriter
+}
+
+func putGzipWriter(writer *gzip.Writer) {
+	gzipWriterPool.Put(writer)
 }
 
 func mergeIn(completion map[string]any, value []byte) {
@@ -506,15 +540,20 @@ func buildProxy(
 				responseWriter io.Writer
 			)
 			if isGzip(newResponse.Header) {
-				var gzipReader *gzip.Reader
-				gzipReader, err = gzip.NewReader(newResponse.Body)
+				var (
+					gzipReader *gzip.Reader
+					gzipWriter *gzip.Writer
+				)
+				gzipReader, err = getGzipReader(newResponse.Body)
 				if err != nil {
 					return
 				}
+				defer putGzipReader(gzipReader)
 				defer gzipReader.Close()
 				scanner = bufio.NewScanner(gzipReader)
 				scanner.Split(splitFunc)
-				gzipWriter, _ := gzip.NewWriterLevel(w, gzip.NoCompression)
+				gzipWriter = getGzipWriter(w)
+				defer putGzipWriter(gzipWriter)
 				defer gzipWriter.Close()
 				responseWriter = gzipWriter
 			} else {
