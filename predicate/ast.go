@@ -55,6 +55,7 @@ func (t *Tree) String() string {
 						}
 					}
 					likeHack(itemExpr)
+					matchHack(itemExpr)
 					lit, isNull := itemExpr.Right.(*LiteralExpr)
 					pushExpr(itemExpr.Left)
 					predicate.WriteString(" ")
@@ -233,6 +234,27 @@ func likeHack(expr *BinaryExpr) {
 					lit.Value = lit.Value[:len(lit.Value)-1] + "%"
 				}
 			}
+		}
+	}
+}
+
+func matchHack(expr *BinaryExpr) {
+	var isMatch bool
+	for _, op := range expr.Op {
+		if op.Type == MATCH {
+			isMatch = true
+			break
+		}
+	}
+	if isMatch {
+		fld, fldOk := expr.Left.(*FieldsExpr)
+		lit, litOk := expr.Right.(*LiteralExpr)
+		if fldOk && litOk && lit.Type == String {
+			// Filthy Hack method, because sqlite will throw an error when performing regexp operations
+			// on null fields, so this is the only way.
+			expr.Left = &Ident{Name: fmt.Sprintf("%[1]s is not null and %[1]s", makeLHS(fld))}
+			lit.Type = Boolean // Prevent adding extra quotation marks during formatting.
+			lit.Value = fmt.Sprintf("cast('%s' as text)", lit.Value)
 		}
 	}
 }

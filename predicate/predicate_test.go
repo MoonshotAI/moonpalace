@@ -73,11 +73,11 @@ func TestParse(t *testing.T) {
 			},
 			{
 				predicate: "response_body % '^data.*$'",
-				want:      "response_body regexp '^data.*$'",
+				want:      "response_body is not null and response_body regexp cast('^data.*$' as text)",
 			},
 			{
 				predicate: "response_body !% '^data.*$'",
-				want:      "response_body not regexp '^data.*$'",
+				want:      "response_body is not null and response_body not regexp cast('^data.*$' as text)",
 			},
 			{
 				predicate: "response_status_code @ [400, 401, '403', 404, false]",
@@ -101,7 +101,7 @@ func TestParse(t *testing.T) {
 			},
 			{
 				predicate: "response_header % \"Msh-Context-Cache-Token-Saved: \\d+\"",
-				want:      "response_header regexp 'Msh-Context-Cache-Token-Saved: \\d+'",
+				want:      "response_header is not null and response_header regexp cast('Msh-Context-Cache-Token-Saved: \\d+' as text)",
 			},
 		}
 		for i, tc := range testcases {
