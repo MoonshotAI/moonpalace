@@ -102,7 +102,7 @@ func hashPrefix(
 	hashList := hashListPool.Get().([]string)
 	defer putHashList(hashList)
 	nBytes := 0
-	uglyTools := pretty.UglyInPlace(tools)
+	uglyTools := pretty.Ugly(tools)
 	hasher.Write(uglyTools)
 	nBytes += len(uglyTools)
 	for _, message := range messages {
