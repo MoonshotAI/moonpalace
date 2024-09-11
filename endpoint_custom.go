@@ -4,6 +4,7 @@
 package main
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -17,6 +18,12 @@ func init() {
 	cobra.OnInitialize(func() {
 		if !flags.Changed("endpoint") && MoonConfig.Endpoint != "" {
 			endpoint = MoonConfig.Endpoint
+		}
+		if eUrl, err := url.Parse(endpoint); err == nil {
+			if eUrl.Scheme == "" {
+				eUrl.Scheme = "https"
+			}
+			endpoint = eUrl.String()
 		}
 		endpoint = strings.TrimSuffix(endpoint, "/")
 	})
