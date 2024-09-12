@@ -13,6 +13,7 @@ import (
 	"math"
 	"net/http"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -479,7 +480,7 @@ func buildProxy(
 						rawMessages := gjson.GetBytes(requestBody, "messages").String()
 						cache = &Cache{
 							Messages: json.RawMessage(rawMessages),
-							Tools:    requestObject.Tools,
+							Tools:    slices.Clone(requestObject.Tools),
 							TTL:      cacheTTL,
 						}
 						if err = caching.Create(r.Context(), key, cache); err == nil {
