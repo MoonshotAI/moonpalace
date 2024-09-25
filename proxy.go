@@ -439,8 +439,9 @@ func buildProxy(
 			newRequest.Header.Del("Accept-Encoding")
 		}
 		if strings.HasSuffix(requestPath, "/chat/completions") && autoCache {
-			if key == "" {
-				key = strings.TrimSpace(
+			cKey := key
+			if cKey == "" {
+				cKey = strings.TrimSpace(
 					strings.TrimPrefix(
 						newRequest.Header.Get("Authorization"),
 						"Bearer",
@@ -448,7 +449,7 @@ func buildProxy(
 				)
 			}
 			go persistence.RemoveInactiveCaches(
-				hashKey(key),
+				hashKey(cKey),
 				time.Now().
 					Add(-time.Duration(cacheCleanup)*time.Second).
 					Format(time.DateTime),
@@ -468,10 +469,10 @@ func buildProxy(
 						cache   *Cache
 						cacheID string
 					)
-					cacheID, err = persistence.GetCacheByHashList(r.Context(), hashList, nBytes/2, hashKey(key))
+					cacheID, err = persistence.GetCacheByHashList(r.Context(), hashList, nBytes/2, hashKey(cKey))
 					switch {
 					case err == nil:
-						if cache, err = caching.Get(r.Context(), key, cacheID); err == nil && cache.Status != "error" {
+						if cache, err = caching.Get(r.Context(), cKey, cacheID); err == nil && cache.Status != "error" {
 							go persistence.UpdateCache(cacheID, time.Now().Format(time.DateTime))
 							newRequest.Header.Set("X-Msh-Context-Cache", cacheID)
 							newRequest.Header.Set("X-Msh-Context-Cache-Reset-TTL", strconv.Itoa(cacheTTL))
@@ -483,14 +484,14 @@ func buildProxy(
 							Tools:    slices.Clone(requestObject.Tools),
 							TTL:      cacheTTL,
 						}
-						if err = caching.Create(r.Context(), key, cache); err == nil {
+						if err = caching.Create(r.Context(), cKey, cache); err == nil {
 							hash := hashList[len(hashList)-1]
 							if err = persistence.SetCache(
 								r.Context(),
 								cache.ID,
 								hash,
 								nBytes,
-								hashKey(key),
+								hashKey(cKey),
 								time.Now().Format(time.DateTime),
 							); err == nil {
 								newRequest.Header.Set("X-Msh-Context-Cache", cache.ID)
