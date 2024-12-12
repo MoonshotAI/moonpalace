@@ -111,10 +111,12 @@ func hashPrefix(
 		hasher.Write([]byte(message.Content))
 		nBytes += len([]byte(message.Content))
 		for _, toolCall := range message.ToolCalls {
-			hasher.Write([]byte(toolCall.Function.Name))
-			nBytes += len([]byte(toolCall.Function.Name))
-			hasher.Write([]byte(toolCall.Function.Arguments))
-			nBytes += len([]byte(toolCall.Function.Arguments))
+			if toolCall.Function != nil {
+				hasher.Write([]byte(toolCall.Function.Name))
+				nBytes += len([]byte(toolCall.Function.Name))
+				hasher.Write([]byte(toolCall.Function.Arguments))
+				nBytes += len([]byte(toolCall.Function.Arguments))
+			}
 		}
 		if nBytes > cacheMinBytes {
 			hashHexCode := hex.EncodeToString(hasher.Sum(nil))
