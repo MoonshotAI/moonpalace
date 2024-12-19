@@ -20,11 +20,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/MoonshotAI/moonpalace/detector/repeat"
-	"github.com/MoonshotAI/moonpalace/merge"
 	"github.com/spf13/cobra"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+
+	"github.com/MoonshotAI/moonpalace/detector/repeat"
+	"github.com/MoonshotAI/moonpalace/merge"
 )
 
 type StartConfig struct {
@@ -57,6 +58,16 @@ const (
 	defaultCacheCleanup  = 86400
 )
 
+var (
+	// defaultAutoCacheConfig is a sentinel variable used to detect whether the
+	// user has manually set the --auto-cache option.
+	defaultAutoCacheConfig = &AutoCacheConfig{
+		MinBytes: defaultCacheMinBytes,
+		TTL:      defaultCacheTTL,
+		Cleanup:  defaultCacheCleanup,
+	}
+)
+
 func startCommand() *cobra.Command {
 	var cfg *StartConfig
 	if MoonConfig.Start != nil {
@@ -81,11 +92,7 @@ func startCommand() *cobra.Command {
 		}
 	}
 	if cfg.AutoCache == nil {
-		cfg.AutoCache = &AutoCacheConfig{
-			MinBytes: defaultCacheMinBytes,
-			TTL:      defaultCacheTTL,
-			Cleanup:  defaultCacheCleanup,
-		}
+		cfg.AutoCache = defaultAutoCacheConfig
 	} else {
 		if cfg.AutoCache.MinBytes == 0 {
 			cfg.AutoCache.MinBytes = defaultCacheMinBytes
@@ -104,7 +111,7 @@ func startCommand() *cobra.Command {
 		repeatThreshold = cfg.DetectRepeat.Threshold
 		repeatMinLength = cfg.DetectRepeat.MinLength
 		forceStream     = cfg.ForceStream
-		autoCache       = cfg.AutoCache != nil
+		autoCache       = cfg.AutoCache != defaultAutoCacheConfig
 		cacheMinBytes   = cfg.AutoCache.MinBytes
 		cacheTTL        = cfg.AutoCache.TTL
 		cacheCleanup    = cfg.AutoCache.Cleanup
