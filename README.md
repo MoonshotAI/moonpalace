@@ -290,6 +290,8 @@ Field Operator Literal
 
 ### 导出请求
 
+**现在，你可以使用 `--curl` 选项来导出请求的 `curl` 命令，以方便你将请求内容复制到你的终端中执行。**
+
 当你认为某个请求不符合预期，或是想向 Moonshot AI 报告某个请求时（无论是 Good Case 还是 Bad Case，我们都欢迎），你可以使用 `export` 命令导出特定的请求：
 
 ```shell

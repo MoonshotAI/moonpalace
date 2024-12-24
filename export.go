@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +24,7 @@ func exportCommand() *cobra.Command {
 		escapeHTML        bool
 		goodCase, badCase bool
 		tags              []string
+		curl              bool
 	)
 	cmd := &cobra.Command{
 		Use:   "export",
@@ -33,6 +36,12 @@ func exportCommand() *cobra.Command {
 					logFatal(sql.ErrNoRows)
 				}
 				logFatal(err)
+			}
+			if curl {
+				if err := writeCurlCommand(os.Stdout, request); err != nil {
+					logFatal(err)
+				}
+				return
 			}
 			if request.IsChat() {
 				switch {
@@ -87,6 +96,7 @@ func exportCommand() *cobra.Command {
 	flags.BoolVar(&goodCase, "good", false, "good case")
 	flags.BoolVar(&badCase, "bad", false, "bad case")
 	flags.StringArrayVar(&tags, "tag", nil, "tags describe the current case")
+	flags.BoolVar(&curl, "curl", false, "export curl command")
 	cmd.MarkFlagsOneRequired("id", "chatcmpl", "requestid")
 	cmd.MarkFlagsMutuallyExclusive("good", "bad")
 	cmd.MarkPersistentFlagFilename("output")
@@ -117,4 +127,57 @@ func genFilename(request *Request) (filename string) {
 		filename = filenameBuilder.String() + ".json"
 	}
 	return filename
+}
+
+func writeCurlCommand(w io.Writer, request *Request) error {
+	escape := func(s string) string {
+		return strings.ReplaceAll(s, "'", `'"'"'`)
+	}
+	if _, err := io.WriteString(w,
+		"curl -X '"+
+			escape(request.RequestMethod)+
+			"' '"+
+			escape(request.Url())+
+			"' \\\n\t",
+	); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(w,
+		`-H "Authorization: Bearer $MOONSHOT_API_KEY"`+"\\\n\t",
+	); err != nil {
+		return err
+	}
+	if request.RequestHeader.Valid {
+		mimeHeader, _ := textproto.
+			NewReader(bufio.NewReader(strings.NewReader(request.RequestHeader.String + "\r\n\r\n"))).
+			ReadMIMEHeader()
+		mimeHeader.Del("Content-Length")
+		mimeHeader.Del("X-Unix-Micro")
+		for k, vv := range mimeHeader {
+			for _, v := range vv {
+				if _, err := io.WriteString(w,
+					"-H '"+
+						escape(k)+
+						": "+
+						escape(v)+
+						"' \\\n\t",
+				); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	if request.RequestBody.Valid {
+		if _, err := io.WriteString(w,
+			"-d '"+
+				escape(request.RequestBody.String)+
+				"'",
+		); err != nil {
+			return err
+		}
+	}
+	if _, err := w.Write([]byte("\n")); err != nil {
+		return err
+	}
+	return nil
 }
