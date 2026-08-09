@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,7 +18,15 @@ func getPalaceDir() string {
 	workingDirOnce.Do(func() {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			logFatal(err)
+			// $HOME (or %USERPROFILE% on Windows) is not set or
+			// is empty. Fall back to the system temp directory so
+			// commands like `moonpalace --version` (which don't
+			// need persistent state) do not crash with a fatal
+			// error. A warning is printed to stderr so the user
+			// knows the cache directory will not survive a
+			// reboot.
+			fmt.Fprintf(os.Stderr, "warning: could not resolve user home directory (%v); using system temp directory for state\n", err)
+			homeDir = os.TempDir()
 		}
 		workingDir = filepath.Join(homeDir, ".moonpalace")
 		stat, err := os.Stat(workingDir)
