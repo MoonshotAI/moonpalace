@@ -198,7 +198,7 @@ var (
 		},
 	}
 	merger = &merge.Merger{
-		StreamFields: []string{"content", "arguments"},
+		StreamFields: []string{"content", "arguments", "reasoning_content"},
 		IndexFields:  []string{"index"},
 	}
 )
